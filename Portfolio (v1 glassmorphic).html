@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lijing Chiu — VFX Artist</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,700&family=Noto+Sans+TC:wght@300;400;500&family=Noto+Serif+TC:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: #060c18;
+      color: #eef2f8;
+      font-family: 'Noto Sans TC', system-ui, sans-serif;
+      overflow-x: hidden;
+      transition: background 0.5s ease, color 0.5s ease;
+    }
+    ::-webkit-scrollbar { width: 3px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(100,155,255,0.38); border-radius: 2px; }
+    @keyframes scrollDrop {
+      0%   { transform: scaleY(0); transform-origin: top;    opacity: 0; }
+      35%  { transform: scaleY(1); transform-origin: top;    opacity: 1; }
+      65%  { transform: scaleY(1); transform-origin: bottom; opacity: 1; }
+      100% { transform: scaleY(0); transform-origin: bottom; opacity: 0; }
+    }
+    @keyframes heroIn {
+      from { opacity: 0; transform: translateY(26px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .nav-links   { display: flex; }
+    .hamburger   { display: none !important; }
+    .mob-menu    { display: none !important; }
+    @media (max-width: 860px) {
+      .nav-links { display: none !important; }
+      .hamburger { display: flex !important; }
+      .mob-menu  { display: flex !important; }
+      .hero-pad  { padding: 0 28px 64px !important; }
+      .ag        { grid-template-columns: 1fr !important; padding: 80px 28px 88px !important; gap: 52px !important; }
+      .fr        { flex-direction: column !important; align-items: flex-start !important; gap: 16px !important; }
+      .contact-col { align-items: flex-start !important; }
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+  const { useState, useEffect, useRef } = React;
+
+  /* ══════════════════════════════════════════════
+     DESIGN TOKENS — dark / light
+  ══════════════════════════════════════════════ */
+  const DARK = {
+    bg:          '#060c18',
+    sectionBg:   'rgba(6,12,24,0.97)',
+    footerBg:    'rgba(3,7,16,0.99)',
+    glassBg:     'rgba(8,16,36,0.40)',
+    glassBorder: 'rgba(100,155,255,0.16)',
+    blue:        '#4488ff',
+    gold:        '#c8aa70',
+    silver:      '#b8cce0',
+    textPrimary: '#eef2f8',
+    textMuted:   'rgba(200,215,235,0.62)',
+    textFaint:   'rgba(200,215,235,0.32)',
+    serif:       "'Cormorant Garamond', 'Noto Serif TC', Georgia, serif",
+    sans:        "'Noto Sans TC', system-ui, sans-serif",
+    grad:        'linear-gradient(135deg, #c8aa70 0%, #eef2f8 50%, #4488ff 100%)',
+    divider:     'rgba(255,255,255,0.06)',
+    trackBg:     'rgba(255,255,255,0.07)',
+    isDark:      true,
+  };
+  const LIGHT = {
+    bg:          '#dce5f4',
+    sectionBg:   'rgba(224,232,248,0.97)',
+    footerBg:    'rgba(210,222,244,0.99)',
+    glassBg:     'rgba(225,232,252,0.52)',
+    glassBorder: 'rgba(60,100,220,0.20)',
+    blue:        '#2060dd',
+    gold:        '#8a6e30',
+    silver:      '#3a5488',
+    textPrimary: '#0c1428',
+    textMuted:   'rgba(20,40,90,0.66)',
+    textFaint:   'rgba(20,40,90,0.36)',
+    serif:       "'Cormorant Garamond', 'Noto Serif TC', Georgia, serif",
+    sans:        "'Noto Sans TC', system-ui, sans-serif",
+    grad:        'linear-gradient(135deg, #8a6e30 0%, #3a5488 50%, #2060dd 100%)',
+    divider:     'rgba(0,0,0,0.07)',
+    trackBg:     'rgba(0,0,0,0.09)',
+    isDark:      false,
+  };
+
+  /* ══════════════════════════════════════════════
+     BILINGUAL COPY
+  ══════════════════════════════════════════════ */
+  const COPY = {
+    zh: {
+      eyebrow:    'VFX ARTIST · UNITY3D SHADER SPECIALIST',
+      tagline:    ['遊戲特效 × 沉浸式展覽 × AI 輔助開發', '以 Particle System 與 Shader 打造令人印象深刻的視覺體驗。'],
+      cta:        '查看我的作品',
+      more:       '了解更多',
+      scroll:     'SCROLL',
+      aLabel:     'ABOUT ME / 關於我',
+      aTitle:     ['用特效', '點亮每個畫面'],
+      bio1:       '我是邱立璟，基隆人，Unity3D 視覺特效師。現任職於遊戲科技公司擔任特效師，曾參與 3A 等級東方風格遊戲開發，擁有互動沉浸式展覽專案經驗，同時有自由接案經驗。',
+      bio2:       '擅長以 Particle System、Shader Graph 與 AI 輔助工具（Claude Code、Codex、Gemini）加速開發流程，並持有 JLPT N1 日文檢定，可進行跨語言協作。',
+      stats:      [['4+','年資歷'],['3','工作職位'],['2022','放視大賞決選']],
+      tLabel:     'TOOLS / 工具使用',
+      sLabel:     'SPECIALISMS',
+      specs:      ['Particle System','Shader Graph','Visual Effect Graph','Post Processing','AI 輔助開發','沉浸式展覽','C# 程式','FL Studio'],
+      footRole:   'VFX Artist · 視覺特效師',
+      navLinks: [
+        { label:'工作經驗', href:'#' },
+        { label:'關於我',   href:'#about' },
+        { label:'聯絡方式', href:'mailto:lijingchiu@yahoo.com.tw' },
+        { label:'工具使用', href:'#about' },
+        { label:'履歷表連結', href:'https://pda.104.com.tw/profile/share/a6QT5YhnOn0Py0BZLnzYDajdUbz7f9mg', accent:true },
+        { label:'作品集連結', href:'https://youtu.be/cRUi3zGelNY?si=cZr0CbqcFBaXwwOE', accent:true },
+      ],
+    },
+    en: {
+      eyebrow:    'VFX ARTIST · UNITY3D SHADER SPECIALIST',
+      tagline:    ['Game VFX × Immersive Exhibitions × AI-Dev', 'Crafting memorable visuals with Particle Systems & Shader art.'],
+      cta:        'View My Work',
+      more:       'Learn More',
+      scroll:     'SCROLL',
+      aLabel:     'ABOUT ME',
+      aTitle:     ['Every frame,', 'lit by VFX'],
+      bio1:       "I'm Lijing Chiu from Keelung, Taiwan — a Unity3D VFX artist currently working at a game tech studio. I've participated in 3A-quality Eastern-style game development, have experience in interactive immersive exhibition projects, and also take on freelance work.",
+      bio2:       'I accelerate pipelines with Particle System, Shader Graph, and AI tools (Claude Code, Codex, Gemini). JLPT N1 certified — able to collaborate in Japanese and Chinese contexts.',
+      stats:      [['4+','Yrs Exp.'],['3','Roles'],['2022','放視大賞 Award']],
+      tLabel:     'TOOLS',
+      sLabel:     'SPECIALISMS',
+      specs:      ['Particle System','Shader Graph','Visual Effect Graph','Post Processing','AI-Assisted Dev','Immersive Exhibits','C# Scripting','FL Studio'],
+      footRole:   'VFX Artist · Unity3D Shader',
+      navLinks: [
+        { label:'Experience', href:'#' },
+        { label:'About',      href:'#about' },
+        { label:'Contact',    href:'mailto:lijingchiu@yahoo.com.tw' },
+        { label:'Tools',      href:'#about' },
+        { label:'Resume',     href:'https://pda.104.com.tw/profile/share/a6QT5YhnOn0Py0BZLnzYDajdUbz7f9mg', accent:true },
+        { label:'Portfolio',  href:'https://youtu.be/cRUi3zGelNY?si=cZr0CbqcFBaXwwOE', accent:true },
+      ],
+    },
+  };
+
+  const TOOLS = [
+    { name:'Unity3D (VFX / Shader)', pct:96 },
+    { name:'Shader Graph / HLSL',    pct:92 },
+    { name:'Adobe Photoshop',        pct:90 },
+    { name:'After Effects',          pct:84 },
+    { name:'3ds Max',                pct:78 },
+    { name:'Blender',                pct:73 },
+    { name:'Substance Designer',     pct:68 },
+  ];
+
+  /* ══════════════════════════════════════════════
+     HOOKS
+  ══════════════════════════════════════════════ */
+  function useScrollY() {
+    const [y, setY] = useState(0);
+    useEffect(() => {
+      const fn = () => setY(window.scrollY);
+      window.addEventListener('scroll', fn, { passive:true });
+      return () => window.removeEventListener('scroll', fn);
+    }, []);
+    return y;
+  }
+
+  function useInView(threshold = 0.13) {
+    const ref  = useRef(null);
+    const [seen, setSeen] = useState(false);
+    useEffect(() => {
+      const obs = new IntersectionObserver(
+        ([e]) => { if (e.isIntersecting) setSeen(true); },
+        { threshold }
+      );
+      if (ref.current) obs.observe(ref.current);
+      return () => obs.disconnect();
+    }, []);
+    return [ref, seen];
+  }
+
+  /* ══════════════════════════════════════════════
+     WEBGL RIBBON CANVAS
+     Mouse attraction + scroll parallax
+     Palette: deep blue · silver-white · cold gold
+  ══════════════════════════════════════════════ */
+  function CinematicCanvas({ isDark }) {
+    const canvasRef = useRef(null);
+    const mouseRef  = useRef({ x:0.5, y:0.5 });
+    const scrollRef = useRef(0);
+    const darkRef   = useRef(isDark ? 1.0 : 0.0);
+    useEffect(() => { darkRef.current = isDark ? 1.0 : 0.0; }, [isDark]);
+
+    useEffect(() => {
+      const canvas = canvasRef.current;
+      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+      if (!gl) return;
+      let animId;
+      const t0 = performance.now();
+
+      const resize = () => {
+        canvas.width  = window.innerWidth;
+        canvas.height = window.innerHeight;
+        gl.viewport(0, 0, canvas.width, canvas.height);
+      };
+      resize();
+      window.addEventListener('resize', resize);
+
+      const onMouse = e => {
+        mouseRef.current = { x: e.clientX / window.innerWidth, y: 1 - e.clientY / window.innerHeight };
+      };
+      const onScroll = () => {
+        scrollRef.current = window.scrollY / Math.max(document.documentElement.scrollHeight - window.innerHeight, 1);
+      };
+      window.addEventListener('mousemove', onMouse, { passive:true });
+      window.addEventListener('scroll', onScroll,   { passive:true });
+
+      /* ── vertex shader ── */
+      const VS = `
+        attribute vec2 a_pos;
+        void main() { gl_Position = vec4(a_pos,0.0,1.0); }
+      `;
+
+      /* ── fragment shader ── */
+      const FS = `
+        precision highp float;
+        uniform float u_time;
+        uniform vec2  u_res;
+        uniform vec2  u_mouse;
+        uniform float u_scroll;
+        uniform float u_dark;
+
+        float ribbon(vec2 p, float yB, float off, float fr, float sp, float am, float th) {
+          float w = yB
+                  + sin(p.x*fr        + u_time*sp        + off       ) * am
+                  + sin(p.x*fr*0.53   + u_time*sp*0.70   + off*1.70  ) * am*0.44
+                  + sin(p.x*fr*0.27   + u_time*sp*0.43   + off*0.85  ) * am*0.26;
+          return abs(p.y - w) - th;
+        }
+        float glo(float d, float s)  { return s * exp(-max(d,0.0)*36.0); }
+        float gloW(float d, float s) { return s * exp(-max(d,0.0)* 7.0); }
+
+        void main() {
+          vec2 uv = (gl_FragCoord.xy - u_res*0.5) / u_res.y;
+          uv.y += u_scroll * 0.10;
+
+          /* diagonal rotation ~33 deg */
+          float ca=cos(0.58), sa=sin(0.58);
+          vec2 r = vec2(uv.x*ca - uv.y*sa, uv.x*sa + uv.y*ca);
+
+          /* mouse distortion — INVERTED: ribbons push outward from cursor */
+          vec2 mUV = (u_mouse - 0.5) * vec2(u_res.x/u_res.y, 1.0);
+          mUV.y += u_scroll * 0.10;
+          vec2 mR  = vec2(mUV.x*ca - mUV.y*sa, mUV.x*sa + mUV.y*ca);
+          float mD = length(r - mR);
+          vec2  mDir = mD > 0.001 ? normalize(r - mR) : vec2(0.0);
+          r = r + mDir * (0.10 * exp(-mD*mD*2.2));
+
+          /* background */
+          vec3 col = mix(vec3(0.76,0.82,0.92), vec3(0.020,0.028,0.062), u_dark);
+
+          float bc = sin(u_time*0.18)*0.5+0.5;
+
+          /* ── 4 blue ribbons — irregular spacing, large amp → crossing ── */
+          vec3 b1=vec3(0.10,0.34,0.90), b2=vec3(0.06,0.50,0.88), b3=vec3(0.15,0.66,1.00);
+          float bm = mix(0.24,1.0,u_dark);
+          float d;
+          d=ribbon(r,-0.62,0.00,2.6,0.30,0.078,0.0078); col+=(glo(d,0.95)*mix(b1,b2,bc)+gloW(d,0.20)*b1)*bm;
+          d=ribbon(r,-0.16,1.20,2.3,0.24,0.088,0.0070); col+=(glo(d,0.82)*mix(b2,b3,bc)+gloW(d,0.15)*b2)*bm;
+          d=ribbon(r, 0.22,2.50,3.1,0.38,0.072,0.0064); col+=(glo(d,0.68)*b3           +gloW(d,0.12)*b3)*bm;
+          d=ribbon(r, 0.58,3.80,2.8,0.29,0.082,0.0074); col+=(glo(d,0.88)*b1           +gloW(d,0.17)*b1)*bm;
+
+          /* ── 3 silver-white ribbons — staggered ── */
+          vec3 s1=vec3(0.72,0.84,0.97), s2=vec3(0.90,0.94,1.00);
+          float sm = mix(0.15,0.82,u_dark);
+          d=ribbon(r,-0.46,5.10,2.2,0.26,0.068,0.0058); col+=(glo(d,0.78)*mix(s1,s2,bc)+gloW(d,0.13)*s1)*sm;
+          d=ribbon(r, 0.36,6.80,2.9,0.33,0.075,0.0062); col+=(glo(d,0.62)*s2           +gloW(d,0.10)*s2)*sm;
+          d=ribbon(r,-0.04,7.50,3.5,0.44,0.042,0.0034); col+=glo(d,1.60)*mix(vec3(1.0,0.96,0.84),s2,0.5)*mix(0.35,1.0,u_dark);
+
+          /* ── 2 cold-gold ribbons ── */
+          vec3 g1=vec3(0.78,0.66,0.38), g2=vec3(0.88,0.80,0.54);
+          float gm = mix(0.15,0.78,u_dark);
+          float gc  = sin(u_time*0.20+0.8)*0.5+0.5;
+          d=ribbon(r,-0.74,0.90,2.4,0.40,0.080,0.0072); col+=(glo(d,0.90)*mix(g1,g2,gc)+gloW(d,0.17)*g1)*gm;
+          d=ribbon(r, 0.46,4.40,2.7,0.46,0.070,0.0066); col+=(glo(d,0.70)*g2           +gloW(d,0.13)*g2)*gm;
+
+          /* vignette — mild */
+          vec2 vq = gl_FragCoord.xy/u_res - 0.5;
+          float vd=clamp(1.0-dot(vq*1.36,vq*1.36),0.0,1.0);
+          float vl=clamp(1.0-dot(vq*0.78,vq*0.78),0.0,1.0);
+          float v = mix(vl,vd,u_dark);
+          col *= mix(0.48,0.30,u_dark) + (1.0-mix(0.48,0.30,u_dark)) * v*v;
+
+          /* tone map + gamma */
+          col *= 0.85;
+          col = col/(col+0.52);
+          col = pow(max(col,0.0), vec3(0.88));
+          gl_FragColor = vec4(col,1.0);
+        }
+      `;
+
+      const mkS = (type, src) => {
+        const s = gl.createShader(type);
+        gl.shaderSource(s, src); gl.compileShader(s); return s;
+      };
+      const prog = gl.createProgram();
+      gl.attachShader(prog, mkS(gl.VERTEX_SHADER, VS));
+      gl.attachShader(prog, mkS(gl.FRAGMENT_SHADER, FS));
+      gl.linkProgram(prog); gl.useProgram(prog);
+
+      const buf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
+      const posL = gl.getAttribLocation(prog, 'a_pos');
+      gl.enableVertexAttribArray(posL);
+      gl.vertexAttribPointer(posL, 2, gl.FLOAT, false, 0, 0);
+
+      const uTime=gl.getUniformLocation(prog,'u_time'), uRes=gl.getUniformLocation(prog,'u_res'),
+            uMouse=gl.getUniformLocation(prog,'u_mouse'), uScroll=gl.getUniformLocation(prog,'u_scroll'),
+            uDark=gl.getUniformLocation(prog,'u_dark');
+
+      let sd = darkRef.current;
+      const draw = () => {
+        sd += (darkRef.current - sd) * 0.04;
+        gl.uniform1f(uTime,  (performance.now()-t0)/1000);
+        gl.uniform2f(uRes,   canvas.width, canvas.height);
+        gl.uniform2f(uMouse, mouseRef.current.x, mouseRef.current.y);
+        gl.uniform1f(uScroll,scrollRef.current);
+        gl.uniform1f(uDark,  sd);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        animId = requestAnimationFrame(draw);
+      };
+      draw();
+
+      return () => {
+        window.removeEventListener('resize', resize);
+        window.removeEventListener('mousemove', onMouse);
+        window.removeEventListener('scroll', onScroll);
+        cancelAnimationFrame(animId);
+      };
+    }, []);
+
+    return (
+      <canvas ref={canvasRef} style={{
+        position:'fixed', inset:0,
+        width:'100vw', height:'100vh',
+        zIndex:0, display:'block',
+      }} />
+    );
+  }
+
+  /* ══════════════════════════════════════════════
+     HLS VIDEO BACKGROUND
+  ══════════════════════════════════════════════ */
+  function VideoBackground({ src }) {
+    const vidRef = useRef(null);
+    const [ready, setReady] = useState(false);
+    useEffect(() => {
+      if (!src || !vidRef.current) return;
+      const v = vidRef.current;
+      if (window.Hls && Hls.isSupported()) {
+        const hls = new Hls({ startLevel:-1, capLevelToPlayerSize:true });
+        hls.loadSource(src); hls.attachMedia(v);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => { v.play().catch(()=>{}); setReady(true); });
+        return () => hls.destroy();
+      } else if (v.canPlayType('application/vnd.apple.mpegurl')) {
+        v.src = src;
+        v.onloadedmetadata = () => { v.play().catch(()=>{}); setReady(true); };
+      }
+    }, [src]);
+    if (!src) return null;
+    return (
+      <video ref={vidRef} muted loop playsInline style={{
+        position:'fixed', inset:0, width:'100%', height:'100%',
+        objectFit:'cover', zIndex:1,
+        opacity: ready ? 1 : 0, transition:'opacity 2s ease',
+      }} />
+    );
+  }
+
+  /* ══════════════════════════════════════════════
+     TOGGLE PILL (language / theme)
+  ══════════════════════════════════════════════ */
+  function TogglePill({ options, value, onChange, C }) {
+    return (
+      <div style={{
+        display:'flex', borderRadius:100,
+        background: C.glassBg,
+        backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)',
+        border:`1px solid ${C.glassBorder}`,
+        overflow:'hidden',
+      }}>
+        {options.map(opt => (
+          <button key={opt.value} onClick={() => onChange(opt.value)} style={{
+            padding:'6px 13px',
+            fontFamily:C.sans, fontSize:11, fontWeight:500, letterSpacing:'0.06em',
+            border:'none', cursor:'pointer', borderRadius:100,
+            background: value === opt.value
+              ? (C.isDark ? 'rgba(100,155,255,0.26)' : 'rgba(40,80,200,0.14)')
+              : 'transparent',
+            color: value === opt.value ? C.textPrimary : C.textMuted,
+            transition:'all 0.2s ease',
+          }}>{opt.label}</button>
+        ))}
+      </div>
+    );
+  }
+
+  /* ══════════════════════════════════════════════
+     NAV LINK
+  ══════════════════════════════════════════════ */
+  function NavLink({ label, href, accent, C }) {
+    const [hov, setHov] = useState(false);
+    return (
+      <a href={href}
+        onMouseEnter={() => setHov(true)}
+        onMouseLeave={() => setHov(false)}
+        style={{
+          fontFamily:C.sans, fontSize:13, fontWeight:400, letterSpacing:'0.05em',
+          color: hov ? C.textPrimary : accent ? C.gold : C.textMuted,
+          textDecoration:'none', cursor:'pointer',
+          transition:'color 0.2s', position:'relative', whiteSpace:'nowrap',
+        }}
+      >
+        {label}
+        {accent && (
+          <span style={{
+            position:'absolute', left:0, right:0, bottom:-4, height:1,
+            background:C.grad,
+            transform: hov ? 'scaleX(1)' : 'scaleX(0)',
+            transformOrigin:'left', transition:'transform 0.2s',
+          }} />
+        )}
+      </a>
+    );
+  }
+
+  /* ══════════════════════════════════════════════
+     NAV
+  ══════════════════════════════════════════════ */
+  function Nav({ lang, setLang, theme, setTheme, C, t }) {
+    const scrollY  = useScrollY();
+    const [open, setOpen] = useState(false);
+    const scrolled = scrollY > 55;
+    const pct = Math.min(scrollY / Math.max(document.documentElement.scrollHeight - window.innerHeight, 1) * 100, 100);
+
+    return (
+      <>
+        <nav style={{
+          position:'fixed', top:0, left:0, right:0, zIndex:200,
+          height:68,
+          display:'flex', alignItems:'center', justifyContent:'space-between',
+          padding:'0 48px',
+          backdropFilter:'blur(24px) saturate(1.5)',
+          WebkitBackdropFilter:'blur(24px) saturate(1.5)',
+          background: C.isDark
+            ? `rgba(6,12,24,${scrolled ? 0.28 : 0.10})`
+            : `rgba(215,225,248,${scrolled ? 0.32 : 0.12})`,
+          borderBottom:`1px solid ${scrolled ? C.glassBorder : 'transparent'}`,
+          transition:'background 0.45s, border-color 0.45s',
+        }}>
+          {/* scroll progress */}
+          <div style={{
+            position:'absolute', top:0, left:0, height:2,
+            width:`${pct}%`, background:C.grad, transition:'width 0.12s',
+          }} />
+
+          {/* logo */}
+          <a href="#" style={{ textDecoration:'none', display:'flex', alignItems:'baseline', gap:10 }}>
+            <span style={{ fontFamily:C.serif, fontSize:22, fontWeight:700, color:C.textPrimary, letterSpacing:'0.01em' }}>
+              邱立璟
+            </span>
+            <span style={{ fontFamily:C.sans, fontSize:10, fontWeight:500, letterSpacing:'0.22em', color:C.gold, opacity:0.82 }}>
+              VFX
+            </span>
+          </a>
+
+          {/* desktop links */}
+          <div className="nav-links" style={{ display:'flex', gap:28, alignItems:'center' }}>
+            {t.navLinks.map(l => <NavLink key={l.label} {...l} C={C} />)}
+          </div>
+
+          {/* right controls */}
+          <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+            <TogglePill C={C} value={lang}  onChange={setLang}
+              options={[{label:'中',value:'zh'},{label:'EN',value:'en'}]} />
+            <TogglePill C={C} value={theme} onChange={setTheme}
+              options={[{label:'◑',value:'dark'},{label:'○',value:'light'}]} />
+            <button className="hamburger" onClick={() => setOpen(o=>!o)} style={{
+              flexDirection:'column', gap:'5px',
+              background:'none', border:'none', cursor:'pointer', padding:'6px',
+            }}>
+              {[0,1,2].map(i => (
+                <span key={i} style={{
+                  display:'block', width:22, height:2,
+                  background:C.textPrimary, borderRadius:1,
+                  transition:'transform 0.28s, opacity 0.28s',
+                  opacity: open && i===1 ? 0 : 1,
+                  transform: open ? (i===0?'translateY(7px) rotate(45deg)':i===2?'translateY(-7px) rotate(-45deg)':'none') : 'none',
+                }} />
+              ))}
+            </button>
+          </div>
+        </nav>
+
+        {/* mobile menu */}
+        <div className="mob-menu" style={{
+          position:'fixed', top:68, left:0, right:0, zIndex:190,
+          flexDirection:'column',
+          backdropFilter:'blur(28px)', WebkitBackdropFilter:'blur(28px)',
+          background: C.isDark ? 'rgba(6,12,24,0.95)' : 'rgba(215,225,248,0.95)',
+          borderBottom:`1px solid ${C.glassBorder}`,
+          maxHeight: open ? '500px' : '0',
+          overflow:'hidden', transition:'max-height 0.38s ease',
+        }}>
+          <div style={{
+            padding: open ? '18px 28px 28px' : '0 28px',
+            transition:'padding 0.38s', display:'flex', flexDirection:'column',
+          }}>
+            {t.navLinks.map((l,i) => (
+              <a key={l.label} href={l.href} style={{
+                fontFamily:C.sans, fontSize:15, fontWeight:400, letterSpacing:'0.05em',
+                color: l.accent ? C.gold : C.textMuted,
+                textDecoration:'none', padding:'13px 0',
+                borderBottom: i < t.navLinks.length-1 ? `1px solid ${C.glassBorder}` : 'none',
+              }}>{l.label}</a>
+            ))}
+            <div style={{ display:'flex', gap:10, marginTop:20 }}>
+              <TogglePill C={C} value={lang}  onChange={setLang}
+                options={[{label:'中',value:'zh'},{label:'EN',value:'en'}]} />
+              <TogglePill C={C} value={theme} onChange={setTheme}
+                options={[{label:'◑',value:'dark'},{label:'○',value:'light'}]} />
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  /* ══════════════════════════════════════════════
+     CTA BUTTON — glass pill
+  ══════════════════════════════════════════════ */
+  function CTABtn({ href, primary, C, children }) {
+    const [hov, setHov] = useState(false);
+    return (
+      <a href={href}
+        onMouseEnter={() => setHov(true)}
+        onMouseLeave={() => setHov(false)}
+        style={{
+          display:'inline-flex', alignItems:'center', gap:10,
+          padding: primary ? '14px 32px' : '13px 26px',
+          fontFamily:C.sans, fontSize:13, fontWeight:500,
+          letterSpacing:'0.07em', textDecoration:'none',
+          borderRadius:100, cursor:'pointer',
+          backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)',
+          transition:'all 0.26s ease',
+          ...(primary ? {
+            background: hov
+              ? (C.isDark ? 'rgba(68,136,255,0.36)' : 'rgba(40,80,200,0.26)')
+              : (C.isDark ? 'rgba(50,100,220,0.22)' : 'rgba(40,80,200,0.14)'),
+            color: C.isDark ? (hov ? '#fff' : 'rgba(200,220,255,0.92)') : (hov ? '#0c1428' : 'rgba(20,50,130,0.90)'),
+            border:`1px solid ${hov ? 'rgba(100,155,255,0.65)' : 'rgba(100,155,255,0.30)'}`,
+            boxShadow: hov
+              ? '0 8px 32px rgba(68,136,255,0.28), inset 0 1px 0 rgba(255,255,255,0.12)'
+              : '0 4px 16px rgba(68,136,255,0.10)',
+            transform: hov ? 'translateY(-2px)' : 'none',
+          } : {
+            background: hov
+              ? (C.isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.07)')
+              : (C.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)'),
+            color: hov ? C.textPrimary : C.textMuted,
+            border:`1px solid ${hov ? C.glassBorder : 'rgba(255,255,255,0.08)'}`,
+            transform: hov ? 'translateY(-1px)' : 'none',
+          }),
+        }}
+      >
+        {children}
+        {primary && <span style={{ fontSize:14, lineHeight:1 }}>→</span>}
+      </a>
+    );
+  }
+
+  /* ══════════════════════════════════════════════
+     HERO
+  ══════════════════════════════════════════════ */
+  function HeroSection({ C, t }) {
+    const anim = d => ({ animation:`heroIn 0.9s ease ${d}s both` });
+    return (
+      <section style={{
+        position:'relative', zIndex:10,
+        height:'100vh', minHeight:620,
+        display:'flex', alignItems:'flex-end',
+      }} data-screen-label="Hero">
+        {/* black overlay — fades out 200px before About */}
+        <div style={{
+          position:'absolute', inset:0,
+          background:'linear-gradient(to bottom, #060c18 0%, #060c18 calc(100% - 220px), transparent 100%)',
+          pointerEvents:'none', zIndex:1,
+        }} />
+        <div style={{ padding:'0 60px 82px', maxWidth:760, position:'relative', zIndex:2 }} className="hero-pad">
+          <div style={{ ...anim(0.10), fontFamily:C.sans, fontSize:11, fontWeight:500,
+            letterSpacing:'0.24em', textTransform:'uppercase', color:C.gold, marginBottom:20 }}>
+            {t.eyebrow}
+          </div>
+          <h1 style={{ ...anim(0.28), fontFamily:C.serif,
+            fontSize:'clamp(54px,8.5vw,106px)', fontWeight:700, lineHeight:1.02,
+            letterSpacing:'-0.028em', color:C.textPrimary }}>
+            Lijing<br />
+            <span style={{ color: C.isDark ? 'rgba(238,242,248,0.78)' : 'rgba(12,20,40,0.70)' }}>
+              Chiu.
+            </span>
+          </h1>
+          <p style={{ ...anim(0.46), fontFamily:C.sans, fontSize:15.5, fontWeight:300,
+            lineHeight:1.9, color:C.textMuted, marginTop:24, maxWidth:420 }}>
+            {t.tagline[0]}<br />{t.tagline[1]}
+          </p>
+          <div style={{ ...anim(0.64), display:'flex', gap:14, alignItems:'center', marginTop:44, flexWrap:'wrap' }}>
+            <CTABtn href="#" primary C={C}>{t.cta}</CTABtn>
+            <CTABtn href="#about" C={C}>{t.more}</CTABtn>
+          </div>
+        </div>
+        {/* scroll indicator */}
+        <div style={{
+          position:'absolute', bottom:46, right:52,
+          display:'flex', flexDirection:'column', alignItems:'center', gap:12,
+          animation:'heroIn 1s ease 1.1s both', opacity:0.4,
+        }}>
+          <div style={{
+            width:1, height:54,
+            background: C.isDark ? 'rgba(200,215,235,0.35)' : 'rgba(12,20,60,0.28)',
+            animation:'scrollDrop 2.4s ease-in-out infinite',
+          }} />
+          <span style={{ fontFamily:C.sans, fontSize:9, letterSpacing:'0.22em', color:C.textMuted, writingMode:'vertical-rl' }}>
+            {t.scroll}
+          </span>
+        </div>
+      </section>
+    );
+  }
+
+  /* ══════════════════════════════════════════════
+     TOOL BAR
+  ══════════════════════════════════════════════ */
+  function ToolBar({ name, pct, inView, delay, C }) {
+    return (
+      <div>
+        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8,
+          fontFamily:C.sans, fontSize:13, color:C.textMuted }}>
+          <span>{name}</span>
+          <span style={{ color:C.gold, fontWeight:300 }}>{pct}%</span>
+        </div>
+        <div style={{ height:2, background:C.trackBg, borderRadius:1, overflow:'hidden' }}>
+          <div style={{
+            height:'100%',
+            width: inView ? `${pct}%` : '0%',
+            background:C.grad, borderRadius:1,
+            transition:`width 1.1s cubic-bezier(.22,1,.36,1) ${delay+0.38}s`,
+          }} />
+        </div>
+      </div>
+    );
+  }
+
+  /* ══════════════════════════════════════════════
+     ABOUT
+  ══════════════════════════════════════════════ */
+  function AboutSection({ C, t }) {
+    const [ref, inView] = useInView(0.12);
+    const slide = d => ({
+      opacity: inView ? 1 : 0,
+      transform: inView ? 'translateY(0)' : 'translateY(36px)',
+      transition:`opacity 0.95s ease ${d}s, transform 0.95s ease ${d}s`,
+    });
+
+    return (
+      <section id="about" ref={ref} data-screen-label="About"
+        className="ag"
+        style={{
+          position:'relative', zIndex:10,
+          background:'transparent',
+          padding:'120px 60px 128px',
+          display:'grid', gridTemplateColumns:'1fr 1fr',
+          gap:'80px', alignItems:'start',
+        }}
+      >
+
+
+        {/* Bio */}
+        <div style={{ ...slide(0), position:'relative', zIndex:3 }}>
+          <span style={{ fontFamily:C.sans, fontSize:11, fontWeight:500,
+            letterSpacing:'0.22em', textTransform:'uppercase', color:C.gold }}>
+            {t.aLabel}
+          </span>
+          <h2 style={{ fontFamily:C.serif,
+            fontSize:'clamp(34px,3.8vw,52px)', fontWeight:700, lineHeight:1.08,
+            color:C.textPrimary, margin:'26px 0 30px' }}>
+            {t.aTitle[0]}<br />
+            {t.aTitle[1]}
+          </h2>
+          <p style={{ fontFamily:C.sans, fontSize:15, fontWeight:300, lineHeight:1.95, color:C.textMuted, marginBottom:20 }}>
+            {t.bio1}
+          </p>
+          <p style={{ fontFamily:C.sans, fontSize:15, fontWeight:300, lineHeight:1.95,
+            color: C.isDark ? 'rgba(200,215,235,0.42)' : 'rgba(20,40,90,0.45)' }}>
+            {t.bio2}
+          </p>
+          {/* stats */}
+          <div style={{ display:'flex', gap:44, marginTop:52, paddingTop:44, borderTop:`1px solid ${C.divider}` }}>
+            {t.stats.map(([n,l]) => (
+              <div key={l}>
+                <div style={{
+                  fontFamily:C.serif,
+                  fontSize:42, fontWeight:700, lineHeight:1.05,
+                  background:C.grad, WebkitBackgroundClip:'text',
+                  WebkitTextFillColor:'transparent', backgroundClip:'text',
+                }}>{n}</div>
+                <div style={{ fontFamily:C.sans, fontSize:12, fontWeight:300,
+                  color:C.textFaint, marginTop:5, letterSpacing:'0.07em' }}>{l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Tools */}
+        <div style={{ ...slide(0.18), position:'relative', zIndex:3 }}>
+          <span style={{ fontFamily:C.sans, fontSize:11, fontWeight:500,
+            letterSpacing:'0.22em', textTransform:'uppercase', color:C.gold }}>
+            {t.tLabel}
+          </span>
+          <div style={{ display:'flex', flexDirection:'column', gap:22, marginTop:32 }}>
+            {TOOLS.map((tool,i) => (
+              <ToolBar key={tool.name} name={tool.name} pct={tool.pct}
+                inView={inView} delay={i*0.07} C={C} />
+            ))}
+          </div>
+          {/* tags */}
+          <div style={{ marginTop:48 }}>
+            <span style={{ fontFamily:C.sans, fontSize:11, fontWeight:500,
+              letterSpacing:'0.22em', textTransform:'uppercase', color:C.gold,
+              display:'block', marginBottom:20 }}>{t.sLabel}</span>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
+              {t.specs.map(tag => (
+                <span key={tag} style={{
+                  fontFamily:C.sans, fontSize:12, fontWeight:300, letterSpacing:'0.04em',
+                  color:C.textMuted, padding:'7px 14px',
+                  border:`1px solid ${C.glassBorder}`, borderRadius:2,
+                }}>{tag}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  /* ══════════════════════════════════════════════
+     FOOTER
+  ══════════════════════════════════════════════ */
+  function Footer({ C, t }) {
+    return (
+      <footer style={{
+        position:'relative', zIndex:10,
+        background:'transparent',
+        borderTop:`1px solid ${C.glassBorder}`,
+        padding:'44px 52px 36px',
+      }}>
+        <div className="fr" style={{
+          display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:28,
+        }}>
+          {/* name + role */}
+          <div>
+            <div style={{ fontFamily:C.serif, fontSize:24, fontWeight:700, color:C.textPrimary, letterSpacing:'0.01em' }}>
+              邱立璟 · Lijing Chiu
+            </div>
+            <div style={{ fontFamily:C.sans, fontSize:12, fontWeight:300,
+              color:C.textFaint, marginTop:7, letterSpacing:'0.06em' }}>
+              {t.footRole}
+            </div>
+          </div>
+          {/* contact */}
+          <div style={{ display:'flex', flexDirection:'column', gap:12, alignItems:'flex-end' }} className="contact-col">
+            <a href="tel:0963471107" style={{
+              display:'flex', alignItems:'center', gap:12,
+              fontFamily:C.sans, fontSize:14, fontWeight:300, letterSpacing:'0.04em',
+              color:C.textMuted, textDecoration:'none', transition:'color 0.2s',
+            }}>
+              <span style={{
+                display:'inline-flex', alignItems:'center', justifyContent:'center',
+                width:28, height:28, borderRadius:100,
+                background: C.isDark ? 'rgba(100,155,255,0.12)' : 'rgba(40,80,200,0.10)',
+                border:`1px solid ${C.glassBorder}`, fontSize:13,
+              }}>☏</span>
+              0963-471-107
+            </a>
+            <a href="mailto:lijingchiu@yahoo.com.tw" style={{
+              display:'flex', alignItems:'center', gap:12,
+              fontFamily:C.sans, fontSize:14, fontWeight:300, letterSpacing:'0.04em',
+              color:C.textMuted, textDecoration:'none', transition:'color 0.2s',
+            }}>
+              <span style={{
+                display:'inline-flex', alignItems:'center', justifyContent:'center',
+                width:28, height:28, borderRadius:100,
+                background: C.isDark ? 'rgba(100,155,255,0.12)' : 'rgba(40,80,200,0.10)',
+                border:`1px solid ${C.glassBorder}`, fontSize:13,
+              }}>✉</span>
+              lijingchiu@yahoo.com.tw
+            </a>
+          </div>
+        </div>
+        {/* bottom line */}
+        <div style={{
+          marginTop:30, paddingTop:20,
+          borderTop:`1px solid ${C.divider}`,
+          fontFamily:C.sans, fontSize:11, color:C.textFaint,
+          letterSpacing:'0.06em',
+          display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:8,
+        }}>
+          <span>© 2026 邱立璟 · Lijing Chiu</span>
+          <span>Keelung, Taiwan</span>
+        </div>
+      </footer>
+    );
+  }
+
+  /* ══════════════════════════════════════════════
+     APP
+     Set HLS_SRC to your .m3u8 URL when ready
+  ══════════════════════════════════════════════ */
+  const HLS_SRC = null;
+
+  function App() {
+    const [lang,  setLang]  = useState('zh');
+    const [theme, setTheme] = useState('dark');
+    const C = theme === 'dark' ? DARK : LIGHT;
+    const t = COPY[lang];
+
+    useEffect(() => {
+      document.body.style.background = C.bg;
+      document.body.style.color      = C.textPrimary;
+    }, [theme]);
+
+    return (
+      <>
+        <CinematicCanvas isDark={theme === 'dark'} />
+        <VideoBackground src={HLS_SRC} />
+        <Nav lang={lang} setLang={setLang} theme={theme} setTheme={setTheme} C={C} t={t} />
+        <main style={{ position:'relative', zIndex:10 }}>
+          <HeroSection C={C} t={t} />
+          <AboutSection C={C} t={t} />
+          <Footer C={C} t={t} />
+        </main>
+      </>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

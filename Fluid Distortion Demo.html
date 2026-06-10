@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>流體全頁擾動 Demo v2</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      min-height: 100vh;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #07050f;
+      color: #e4dcff;
+      overflow-x: hidden;
+    }
+
+    /* ── Debug: 位移圖小視窗（右下角）─────────────────────────── */
+    #fluid-canvas {
+      position: fixed;
+      bottom: 12px; right: 12px;
+      width: 120px; height: 120px;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 8px;
+      pointer-events: none;
+      z-index: 99999;
+      opacity: 0.6;
+    }
+
+    /* ── 頁面內容套 CSS filter（最可靠的全頁擾動方式）────────── */
+    #page-content {
+      position: relative;
+      min-height: 100vh;
+      /* filter 由 JS 在 WebGL 初始化後動態套上 */
+    }
+
+    /* ── Demo UI ─────────────────────────────────────────────── */
+    .hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+      padding: 80px 24px 60px;
+      gap: 28px;
+      text-align: center;
+      background:
+        radial-gradient(ellipse 60% 50% at 25% 35%, rgba(100,30,220,0.32), transparent),
+        radial-gradient(ellipse 55% 45% at 75% 65%, rgba(20,90,200,0.26), transparent),
+        radial-gradient(ellipse 40% 35% at 50% 90%, rgba(180,20,100,0.18), transparent);
+    }
+
+    .hero h1 {
+      font-size: clamp(2.4rem, 7vw, 5.5rem);
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      line-height: 1.05;
+      background: linear-gradient(130deg, #c4b5fd 0%, #60a5fa 45%, #f472b6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero .sub {
+      font-size: clamp(0.95rem, 2vw, 1.2rem);
+      color: rgba(190,178,255,0.65);
+      max-width: 560px;
+      line-height: 1.75;
+    }
+
+    .btn-row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+
+    .btn {
+      padding: 13px 30px;
+      border-radius: 100px;
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.25s, filter 0.25s;
+    }
+    .btn:hover { transform: scale(1.08); filter: brightness(1.2); }
+    .btn:active { transform: scale(0.97); }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #7c3aed, #3b82f6);
+      color: #fff;
+      box-shadow: 0 0 22px rgba(124,58,237,0.45);
+    }
+
+    .btn-secondary {
+      background: rgba(167,139,250,0.12);
+      color: #c4b5fd;
+      border: 1.5px solid rgba(167,139,250,0.35);
+    }
+    .btn-secondary:hover { background: rgba(167,139,250,0.22); }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 18px;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 20px 32px 80px;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.035);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 18px;
+      padding: 28px 24px;
+      transition: border-color 0.3s, transform 0.35s;
+    }
+    .card:hover { border-color: rgba(167,139,250,0.4); transform: translateY(-4px); }
+
+    .card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 8px; color: #c4b5fd; }
+    .card p  { font-size: 0.85rem; color: rgba(190,178,255,0.5); line-height: 1.65; }
+
+    .demo-input {
+      display: block;
+      width: 100%; max-width: 420px;
+      margin: 0 auto 60px;
+      padding: 14px 20px;
+      background: rgba(167,139,250,0.08);
+      border: 1.5px solid rgba(167,139,250,0.22);
+      border-radius: 12px;
+      color: #e4dcff;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.25s;
+    }
+    .demo-input:focus { border-color: rgba(167,139,250,0.6); }
+    .demo-input::placeholder { color: rgba(190,178,255,0.3); }
+
+    /* 狀態列 */
+    #status-bar {
+      position: fixed;
+      top: 12px; left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.55);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 100px;
+      padding: 6px 18px;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(200,190,255,0.5);
+      pointer-events: none;
+      z-index: 99999;
+      backdrop-filter: blur(8px);
+    }
+  </style>
+</head>
+<body>
+
+<!-- Debug 位移圖（右下角小視窗，確認 WebGL 在跑） -->
+<canvas id="fluid-canvas"></canvas>
+
+<!-- SVG 濾鏡：feImage 吃 data URL，feDisplacementMap 偏移像素 -->
+<svg id="fluid-svg" xmlns="http://www.w3.org/2000/svg"
+     style="position:fixed;width:0;height:0;overflow:hidden;pointer-events:none;">
+  <defs>
+    <filter id="fluid-filter"
+            x="-10%" y="-10%" width="120%" height="120%"
+            color-interpolation-filters="sRGB">
+      <!-- 位移圖來自 WebGL canvas（每幀更新 dataURL）-->
+      <feImage id="fluid-fe-image"
+               result="disp-map"
+               preserveAspectRatio="none"/>
+      <!-- 核心位移：scale 越大扭曲越明顯 -->
+      <feDisplacementMap
+               in="SourceGraphic" in2="disp-map"
+               id="fluid-fe-disp"
+               scale="200"
+               xChannelSelector="R"
+               yChannelSelector="G"/>
+    </filter>
+  </defs>
+</svg>
+
+<!-- 狀態提示 -->
+<div id="status-bar">initializing…</div>
+
+<!-- 頁面內容（套 filter: url(#fluid-filter)，比 backdrop-filter 更可靠）-->
+<div id="page-content">
+  <section class="hero">
+    <h1>流體全頁<br>即時擾動</h1>
+    <p class="sub">移動滑鼠，文字、按鈕、卡片都被流體力學扭曲。<br>右下角小視窗可看到即時位移圖。</p>
+    <div class="btn-row">
+      <button class="btn btn-primary"
+              onclick="this.textContent='✓ 點擊成功！';setTimeout(()=>this.textContent='主要按鈕',1500)">主要按鈕</button>
+      <button class="btn btn-secondary"
+              onclick="document.getElementById('fluid-fe-disp').setAttribute('scale', +document.getElementById('fluid-fe-disp').getAttribute('scale')+50)">
+        +50 強度
+      </button>
+      <button class="btn btn-secondary"
+              onclick="document.getElementById('fluid-fe-disp').setAttribute('scale', Math.max(0,+document.getElementById('fluid-fe-disp').getAttribute('scale')-50))">
+        -50 強度
+      </button>
+    </div>
+  </section>
+
+  <div class="cards">
+    <div class="card">
+      <h3>🌊 Navier-Stokes</h3>
+      <p>完整求解不可壓縮流：速度對流、壓力 Jacobi 迭代 16 次、梯度修正。</p>
+    </div>
+    <div class="card">
+      <h3>🖼️ 位移圖輸出</h3>
+      <p>輸出著色器將速度場編碼為 R=vx G=vy 位移圖，每 2 幀以 dataURL 推送至 feImage。</p>
+    </div>
+    <div class="card">
+      <h3>✅ 事件穿透</h3>
+      <p>CSS filter 不影響 DOM 事件派發，點擊、Hover、選字全部正常。</p>
+    </div>
+  </div>
+
+  <input class="demo-input" type="text" placeholder="可正常輸入文字（filter 不阻擋互動）" />
+</div>
+
+<!-- ═══════════════ 著色器（頂點，ksenia-k 原版）═══════════════ -->
+<script type="x-shader/x-vertex" id="vertShader">
+  precision highp float;
+  varying vec2 vUv;
+  attribute vec2 a_position;
+  varying vec2 vL; varying vec2 vR; varying vec2 vT; varying vec2 vB;
+  uniform vec2 u_texel;
+  void main () {
+    vUv = .5 * (a_position + 1.);
+    vL = vUv - vec2(u_texel.x, 0.);
+    vR = vUv + vec2(u_texel.x, 0.);
+    vT = vUv + vec2(0., u_texel.y);
+    vB = vUv - vec2(0., u_texel.y);
+    gl_Position = vec4(a_position, 0., 1.);
+  }
+</script>
+
+<script type="x-shader/x-fragment" id="fragShaderAdvection">
+  precision highp float; precision highp sampler2D;
+  varying vec2 vUv;
+  uniform sampler2D u_velocity_texture, u_input_texture;
+  uniform vec2 u_texel, u_output_textel;
+  uniform float u_dt, u_dissipation;
+  vec4 bilerp(sampler2D s, vec2 uv, vec2 ts) {
+    vec2 st=uv/ts-.5, iuv=floor(st), fuv=fract(st);
+    vec4 a=texture2D(s,(iuv+vec2(.5,.5))*ts), b=texture2D(s,(iuv+vec2(1.5,.5))*ts),
+         c=texture2D(s,(iuv+vec2(.5,1.5))*ts), d=texture2D(s,(iuv+vec2(1.5,1.5))*ts);
+    return mix(mix(a,b,fuv.x),mix(c,d,fuv.x),fuv.y);
+  }
+  void main () {
+    vec2 coord=vUv-u_dt*bilerp(u_velocity_texture,vUv,u_texel).xy*u_texel;
+    gl_FragColor=u_dissipation*bilerp(u_input_texture,coord,u_output_textel);
+  }
+</script>
+
+<script type="x-shader/x-fragment" id="fragShaderDivergence">
+  precision highp float; precision highp sampler2D;
+  varying highp vec2 vUv,vL,vR,vT,vB;
+  uniform sampler2D u_velocity_texture;
+  void main () {
+    gl_FragColor=vec4(.25*(texture2D(u_velocity_texture,vR).x-texture2D(u_velocity_texture,vL).x
+      +texture2D(u_velocity_texture,vT).y-texture2D(u_velocity_texture,vB).y),0.,0.,1.);
+  }
+</script>
+
+<script type="x-shader/x-fragment" id="fragShaderPressure">
+  precision highp float; precision highp sampler2D;
+  varying highp vec2 vUv,vL,vR,vT,vB;
+  uniform sampler2D u_pressure_texture, u_divergence_texture;
+  void main () {
+    float L=texture2D(u_pressure_texture,vL).x, R=texture2D(u_pressure_texture,vR).x,
+          T=texture2D(u_pressure_texture,vT).x, B=texture2D(u_pressure_texture,vB).x;
+    gl_FragColor=vec4((L+R+B+T-texture2D(u_divergence_texture,vUv).x)*.25,0.,0.,1.);
+  }
+</script>
+
+<script type="x-shader/x-fragment" id="fragShaderGradientSubtract">
+  precision highp float; precision highp sampler2D;
+  varying highp vec2 vUv,vL,vR,vT,vB;
+  uniform sampler2D u_pressure_texture, u_velocity_texture;
+  void main () {
+    float L=texture2D(u_pressure_texture,vL).x, R=texture2D(u_pressure_texture,vR).x,
+          T=texture2D(u_pressure_texture,vT).x, B=texture2D(u_pressure_texture,vB).x;
+    vec2 v=texture2D(u_velocity_texture,vUv).xy; v-=vec2(R-L,T-B);
+    gl_FragColor=vec4(v,0.,1.);
+  }
+</script>
+
+<script type="x-shader/x-fragment" id="fragShaderPoint">
+  precision highp float; precision highp sampler2D;
+  varying vec2 vUv;
+  uniform sampler2D u_input_texture;
+  uniform float u_ratio, u_point_size;
+  uniform vec3 u_point_value;
+  uniform vec2 u_point;
+  void main () {
+    vec2 p=vUv-u_point.xy; p.x*=u_ratio;
+    vec3 splat=.6*pow(2.,-dot(p,p)/u_point_size)*u_point_value;
+    gl_FragColor=vec4(texture2D(u_input_texture,vUv).xyz+splat,1.);
+  }
+</script>
+
+<!-- ═══ 輸出著色器（修改）：速度場 → 位移圖 ═══
+     核心扭曲公式保留（同 ksenia-k）：
+       vel_norm = normalize(velocity) × energy
+     編碼為位移圖：
+       R = 0.5 + vel_norm.x × strength  (0.5=無位移)
+       G = 0.5 + vel_norm.y × strength
+     ═══════════════════════════════════════════ -->
+<script type="x-shader/x-fragment" id="fragShaderOutputShader">
+  precision highp float; precision highp sampler2D;
+  varying vec2 vUv;
+  uniform sampler2D u_output_texture, u_velocity_texture;
+  void main () {
+    float energy = texture2D(u_output_texture, vUv).r;
+    vec2 velocity = texture2D(u_velocity_texture, vUv).xy + vec2(0.001);
+    vec2 vel_norm = normalize(velocity) * energy;          /* 核心公式 */
+    float r = clamp(0.5 + vel_norm.x * 5.0, 0.0, 1.0);   /* ×5 放大 */
+    float g = clamp(0.5 + vel_norm.y * 5.0, 0.0, 1.0);
+    gl_FragColor = vec4(r, g, 0.5, 1.0);
+  }
+</script>
+
+<script>
+(function () {
+  'use strict';
+
+  const canvasEl  = document.getElementById('fluid-canvas');
+  const feImg     = document.getElementById('fluid-fe-image');
+  const pageEl    = document.getElementById('page-content');
+  const statusEl  = document.getElementById('status-bar');
+  const SIM_RES   = 256;
+
+  canvasEl.width  = SIM_RES;
+  canvasEl.height = SIM_RES;
+
+  /* ── WebGL（preserveDrawingBuffer 確保 toDataURL 有內容）── */
+  const gl = canvasEl.getContext('webgl', {
+    alpha: false, antialias: false, preserveDrawingBuffer: true
+  });
+  if (!gl) { statusEl.textContent = 'WebGL not supported'; return; }
+  gl.getExtension('OES_texture_float');
+
+  /* ── 套上 CSS filter（比 backdrop-filter+SVG 更可靠）────── */
+  pageEl.style.filter = 'url(#fluid-filter)';
+  statusEl.textContent = 'move mouse…';
+
+  /* ── 游標 ────────────────────────────────────────────────── */
+  const pointer = { x: innerWidth/2, y: innerHeight/2, dx:0, dy:0, moved:false };
+  document.addEventListener('mousemove', e => {
+    pointer.dx = 6*(e.clientX-pointer.x);
+    pointer.dy = 6*(e.clientY-pointer.y);
+    pointer.x  = e.clientX;
+    pointer.y  = e.clientY;
+    pointer.moved = true;
+  }, { passive:true });
+  document.addEventListener('touchmove', e => {
+    pointer.dx = 6*(e.touches[0].clientX-pointer.x);
+    pointer.dy = 6*(e.touches[0].clientY-pointer.y);
+    pointer.x  = e.touches[0].clientX;
+    pointer.y  = e.touches[0].clientY;
+    pointer.moved = true;
+  }, { passive:true });
+
+  /* ── Compile helpers ─────────────────────────────────────── */
+  function compile(type, id) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, document.getElementById(id).innerHTML.trim());
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+      console.error('[FluidSim]', id, gl.getShaderInfoLog(s));
+    return s;
+  }
+
+  const vert = compile(gl.VERTEX_SHADER, 'vertShader');
+
+  function prog(fragId) {
+    const f = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(f, document.getElementById(fragId).innerHTML.trim());
+    gl.compileShader(f);
+    if (!gl.getShaderParameter(f, gl.COMPILE_STATUS))
+      console.error('[FluidSim]', fragId, gl.getShaderInfoLog(f));
+    const p = gl.createProgram();
+    gl.attachShader(p, vert); gl.attachShader(p, f); gl.linkProgram(p);
+    const u = {}, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+    for (let i=0;i<n;i++){const nm=gl.getActiveUniform(p,i).name; u[nm]=gl.getUniformLocation(p,nm);}
+    return { program:p, uniforms:u };
+  }
+
+  const splatProg   = prog('fragShaderPoint');
+  const divProg     = prog('fragShaderDivergence');
+  const presProg    = prog('fragShaderPressure');
+  const gradProg    = prog('fragShaderGradientSubtract');
+  const advProg     = prog('fragShaderAdvection');
+  const dispProg    = prog('fragShaderOutputShader');
+
+  /* ── FBO ─────────────────────────────────────────────────── */
+  function fbo(w,h){
+    gl.activeTexture(gl.TEXTURE0);
+    const t=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,t);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,w,h,0,gl.RGB,gl.FLOAT,null);
+    const fb=gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER,fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,t,0);
+    gl.viewport(0,0,w,h); gl.clear(gl.COLOR_BUFFER_BIT);
+    return { fbo:fb, width:w, height:h,
+             attach(id){ gl.activeTexture(gl.TEXTURE0+id); gl.bindTexture(gl.TEXTURE_2D,t); return id; }};
+  }
+  function dfbo(w,h){
+    let a=fbo(w,h), b=fbo(w,h);
+    return { width:w, height:h, texelSizeX:1/w, texelSizeY:1/h,
+             read:()=>a, write:()=>b, swap(){ const t=a;a=b;b=t; }};
+  }
+
+  const oCol = dfbo(SIM_RES,SIM_RES);
+  const vel  = dfbo(SIM_RES,SIM_RES);
+  const div  = fbo(SIM_RES,SIM_RES);
+  const pres = dfbo(SIM_RES,SIM_RES);
+
+  /* ── Blit ────────────────────────────────────────────────── */
+  function blit(target){
+    gl.bindBuffer(gl.ARRAY_BUFFER,gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,-1,1,1,1,1,-1]),gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,gl.createBuffer());
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array([0,1,2,0,2,3]),gl.STATIC_DRAW);
+    gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0); gl.enableVertexAttribArray(0);
+    if(target==null){ gl.viewport(0,0,gl.drawingBufferWidth,gl.drawingBufferHeight); gl.bindFramebuffer(gl.FRAMEBUFFER,null); }
+    else { gl.viewport(0,0,target.width,target.height); gl.bindFramebuffer(gl.FRAMEBUFFER,target.fbo); }
+    gl.drawElements(gl.TRIANGLES,6,gl.UNSIGNED_SHORT,0);
+  }
+
+  /* ── Render Loop ─────────────────────────────────────────── */
+  let frame = 0, hasActivity = false;
+
+  function render(){
+    requestAnimationFrame(render);
+    const dt = 1/60;
+
+    if(pointer.moved){
+      pointer.moved = false; hasActivity = true;
+
+      /* 速度 splat */
+      gl.useProgram(splatProg.program);
+      gl.uniform1i(splatProg.uniforms.u_input_texture, vel.read().attach(1));
+      gl.uniform1f(splatProg.uniforms.u_ratio,  canvasEl.width/canvasEl.height);
+      gl.uniform2f(splatProg.uniforms.u_point,  pointer.x/innerWidth, 1-pointer.y/innerHeight);
+      gl.uniform3f(splatProg.uniforms.u_point_value, pointer.dx,-pointer.dy,0);
+      gl.uniform1f(splatProg.uniforms.u_point_size, 3*.001);
+      blit(vel.write()); vel.swap();
+
+      /* 能量 splat */
+      gl.uniform1i(splatProg.uniforms.u_input_texture, oCol.read().attach(1));
+      gl.uniform3f(splatProg.uniforms.u_point_value, 30*.001,0,0);
+      blit(oCol.write()); oCol.swap();
+    }
+
+    /* 散度 */
+    gl.useProgram(divProg.program);
+    gl.uniform2f(divProg.uniforms.u_texel, vel.texelSizeX, vel.texelSizeY);
+    gl.uniform1i(divProg.uniforms.u_velocity_texture, vel.read().attach(1));
+    blit(div);
+
+    /* 壓力 */
+    gl.useProgram(presProg.program);
+    gl.uniform2f(presProg.uniforms.u_texel, vel.texelSizeX, vel.texelSizeY);
+    gl.uniform1i(presProg.uniforms.u_divergence_texture, div.attach(1));
+    for(let i=0;i<16;i++){
+      gl.uniform1i(presProg.uniforms.u_pressure_texture, pres.read().attach(2));
+      blit(pres.write()); pres.swap();
+    }
+
+    /* 梯度修正 */
+    gl.useProgram(gradProg.program);
+    gl.uniform2f(gradProg.uniforms.u_texel, vel.texelSizeX, vel.texelSizeY);
+    gl.uniform1i(gradProg.uniforms.u_pressure_texture, pres.read().attach(1));
+    gl.uniform1i(gradProg.uniforms.u_velocity_texture, vel.read().attach(2));
+    blit(vel.write()); vel.swap();
+
+    /* 速度對流 */
+    gl.useProgram(advProg.program);
+    gl.uniform2f(advProg.uniforms.u_texel, vel.texelSizeX, vel.texelSizeY);
+    gl.uniform2f(advProg.uniforms.u_output_textel, vel.texelSizeX, vel.texelSizeY);
+    gl.uniform1i(advProg.uniforms.u_velocity_texture, vel.read().attach(1));
+    gl.uniform1i(advProg.uniforms.u_input_texture, vel.read().attach(1));
+    gl.uniform1f(advProg.uniforms.u_dt, dt);
+    gl.uniform1f(advProg.uniforms.u_dissipation, .97);
+    blit(vel.write()); vel.swap();
+
+    /* 能量對流 */
+    gl.uniform2f(advProg.uniforms.u_output_textel, oCol.texelSizeX, oCol.texelSizeY);
+    gl.uniform1i(advProg.uniforms.u_input_texture, oCol.read().attach(2));
+    gl.uniform1f(advProg.uniforms.u_dt, 8*dt);
+    gl.uniform1f(advProg.uniforms.u_dissipation, .98);
+    blit(oCol.write()); oCol.swap();
+
+    /* 輸出位移圖到 canvas */
+    gl.useProgram(dispProg.program);
+    gl.uniform1i(dispProg.uniforms.u_output_texture,   oCol.read().attach(1));
+    gl.uniform1i(dispProg.uniforms.u_velocity_texture, vel.read().attach(2));
+    blit(null);
+    gl.viewport(0,0,gl.drawingBufferWidth,gl.drawingBufferHeight);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+    gl.drawElements(gl.TRIANGLES,6,gl.UNSIGNED_SHORT,0);
+
+    /* ── 關鍵：每 2 幀以 dataURL 更新 feImage，確保瀏覽器讀到最新位移圖 ── */
+    frame++;
+    if(frame % 2 === 0){
+      const url = canvasEl.toDataURL();
+      feImg.setAttribute('href', url);
+      if(hasActivity) statusEl.textContent = 'distorting… scale=' +
+        document.getElementById('fluid-fe-disp').getAttribute('scale');
+    }
+  }
+
+  requestAnimationFrame(render);
+})();
+</script>
+</body>
+</html>

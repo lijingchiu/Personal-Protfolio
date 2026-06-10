@@ -1,0 +1,2628 @@
+<!DOCTYPE html>
+<html lang="zh-TW" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Lijing Chiu — VFX Artist</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@400;600;700;900&family=Cormorant+Garamond:ital,wght@1,700&display=swap" rel="stylesheet" />
+
+  <script type="importmap">
+  {"imports":{
+    "three":"https://cdn.jsdelivr.net/npm/three@0.167.1/build/three.module.js",
+    "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.167.1/examples/jsm/"
+  }}
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script src="https://unpkg.com/lenis@1.1.14/dist/lenis.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js"></script>
+
+  <style>
+/* ═══════════════════════════════════════════════════════════════
+   DESIGN TOKENS
+═══════════════════════════════════════════════════════════════ */
+:root {
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --maxw: 1440px;
+  --pad: clamp(24px, 5vw, 80px);
+  /* Dark-first (matches wave/star background) */
+  --bg:        #0e0f14;
+  --fg:        #e8eaf2;
+  --accent:    hsl(218, 46%, 54%);
+  --accent2:   hsl(324, 50%, 45%);
+  --accent3:   hsl(271, 46%, 65%);
+  --hair:      rgba(232,234,242,0.10);
+  --faint:     rgba(232,234,242,0.35);
+  /* Liquid Glass tokens */
+  --lg-bg:     rgba(255,255,255,0.08);
+  --lg-brd:    rgba(255,255,255,0.20);
+  --lg-hi:     rgba(255,255,255,0.45);
+  --lg-shd:    rgba(0,0,0,0.30);
+  --lg-blur:   blur(40px) saturate(200%);
+  --glass:     rgba(255,255,255,0.08);
+  --glass-brd: rgba(255,255,255,0.18);
+  --crystal:   rgba(210,225,255,0.55);
+  --neon-glow: 0 0 20px rgba(29,110,245,0.4), 0 0 44px rgba(232,0,140,0.18);
+}
+[data-theme="light"] {
+  --bg:        #f7f8f2;
+  --fg:        #080a0e;
+  --hair:      rgba(8,10,14,0.10);
+  --faint:     rgba(8,10,14,0.35);
+  --lg-bg:     rgba(8,10,14,0.05);
+  --lg-brd:    rgba(8,10,14,0.14);
+  --lg-hi:     rgba(255,255,255,0.75);
+  --lg-shd:    rgba(0,0,0,0.08);
+  --glass:     rgba(8,10,14,0.05);
+  --glass-brd: rgba(8,10,14,0.12);
+}
+
+/* ═══ Reset ═══ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; overflow-x: hidden; background: var(--bg); }
+/* Lenis */
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+
+body {
+  background: transparent;
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+  transition: background 0.25s linear;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--hair); border-radius: 2px; }
+
+/* ═══ WebGL canvas ═══ */
+#bg-wave {
+  position: fixed; inset: 0;
+  width: 100vw; height: 100vh;
+  z-index: 0; display: block; pointer-events: none;
+}
+#gl {
+  position: fixed; inset: 0;
+  width: 100vw; height: 100vh;
+  z-index: 0; display: block; pointer-events: none;
+}
+
+/* ═══ NAV ═══ */
+.nav {
+  position: fixed; top: 22px; left: 0; right: 0;
+  z-index: 100;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0 var(--pad);
+  pointer-events: none;
+}
+.nav > * { pointer-events: auto; }
+.logo {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 900; font-size: 1.05rem; letter-spacing: -0.02em;
+  color: var(--fg); text-decoration: none; display: flex; align-items: center; gap: 6px;
+}
+.logo .dot { color: var(--faint); margin: 0 4px; }
+.logo .tag-sub {
+  font-family: 'Inter', 'Noto Sans TC', sans-serif;
+  font-size: 0.60rem; font-weight: 500;
+  letter-spacing: 0.10em;
+  color: rgba(232,234,242,0.45);
+  margin-left: 2px;
+}
+.nav-right { display: flex; align-items: center; gap: 10px; }
+/* Liquid Glass pill — Apple WWDC25 style */
+.pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 38px; padding: 0 18px;
+  border-radius: 100px;
+  border: 1px solid var(--lg-brd);
+  background: var(--lg-bg);
+  backdrop-filter: var(--lg-blur);
+  -webkit-backdrop-filter: var(--lg-blur);
+  color: var(--fg); text-decoration: none;
+  font-size: 0.83rem; font-weight: 600;
+  letter-spacing: 0.02em; cursor: pointer; white-space: nowrap;
+  box-shadow:
+    inset 0 1.5px 0 var(--lg-hi),
+    inset 0 -1px 0 rgba(0,0,0,0.14),
+    0 6px 24px var(--lg-shd),
+    0 1px 4px rgba(0,0,0,0.18);
+  transition: box-shadow 0.25s, background 0.25s, border-color 0.25s;
+  position: relative; overflow: hidden;
+}
+/* Top specular shimmer */
+.pill::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(160deg,
+    rgba(255,255,255,0.20) 0%,
+    rgba(255,255,255,0.04) 40%,
+    transparent 70%);
+  border-radius: inherit; pointer-events: none;
+}
+.pill:hover {
+  background: rgba(255,255,255,0.14);
+  border-color: rgba(255,255,255,0.32);
+  box-shadow:
+    inset 0 1.5px 0 var(--lg-hi),
+    inset 0 -1px 0 rgba(0,0,0,0.14),
+    0 10px 36px var(--lg-shd),
+    0 0 0 1px rgba(255,255,255,0.06);
+}
+/* CTA pill — blue accent glass */
+.pill--cta {
+  background: rgba(29,110,245,0.18);
+  border-color: rgba(29,110,245,0.40);
+  color: #e8eaf2;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,0.45),
+    inset 0 -1px 0 rgba(0,0,0,0.18),
+    0 6px 24px rgba(29,110,245,0.28),
+    0 1px 4px rgba(0,0,0,0.2);
+}
+.pill--cta:hover {
+  background: rgba(29,110,245,0.30);
+  border-color: rgba(29,110,245,0.60);
+}
+.pill--icon { width: 38px; padding: 0; justify-content: center; }
+/* Nav layout */
+.nav-right { flex-wrap: nowrap; align-items: center; }
+.nav-right > .pill,
+.nav-right > a.pill { flex-shrink: 0; white-space: nowrap; box-sizing: border-box; height: 38px; min-height: 38px; line-height: 1; align-self: center; }
+.nav-right > .seg  { flex-shrink: 0; box-sizing: border-box; height: 38px; min-height: 38px; align-self: center; }
+
+.seg {
+  display: inline-flex; align-items: center;
+  border: 1px solid var(--lg-brd);
+  border-radius: 100px; overflow: hidden;
+  backdrop-filter: var(--lg-blur);
+  -webkit-backdrop-filter: var(--lg-blur);
+  background: var(--lg-bg);
+  height: 38px;
+  box-shadow:
+    inset 0 1.5px 0 var(--lg-hi),
+    0 4px 16px var(--lg-shd);
+}
+.seg button {
+  background: transparent; border: none; cursor: pointer;
+  padding: 0 16px; font-size: 0.78rem; font-weight: 700;
+  letter-spacing: 0.06em; color: var(--fg); opacity: 0.55;
+  transition: color 0.2s, background 0.2s, opacity 0.2s;
+  height: 100%;
+}
+.seg button[aria-pressed="true"] {
+  background: rgba(255,255,255,0.16);
+  color: var(--fg); opacity: 1;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.35);
+}
+.nav-desktop { display: flex; }
+.nav-mobile  { display: none; }
+@media (max-width: 720px) {
+  .nav-desktop { display: none; }
+  .nav-mobile  { display: flex; }
+}
+/* Mobile fullscreen menu */
+.mob {
+  position: fixed; inset: 0; z-index: 99;
+  background: var(--bg);
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  gap: 32px; padding: 40px;
+  transform: translateY(-100%); transition: transform 0.5s var(--ease-spring);
+}
+.mob.open { transform: translateY(0); }
+.mob a {
+  font-family: 'Noto Serif TC', serif;
+  font-size: clamp(28px, 8vw, 56px); font-weight: 900;
+  color: var(--fg); text-decoration: none; letter-spacing: -0.03em;
+}
+.mob__contact { font-size: 13px; color: var(--faint); text-align: center; display: flex; flex-direction: column; gap: 6px; }
+
+/* ═══ TYPOGRAPHY ═══ */
+.kicker {
+  font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--accent); font-weight: 700;
+}
+.macro {
+  font-family: 'Noto Serif TC', 'Noto Sans TC', serif;
+  font-weight: 800; letter-spacing: -0.045em; line-height: 0.92;
+  font-size: clamp(58px, 15vw, 230px); text-transform: uppercase;
+}
+.macro .row { display: block; overflow: hidden; padding-bottom: 0.22em; margin-bottom: -0.22em; }
+.h2 {
+  font-family: 'Noto Serif TC', 'Noto Sans TC', serif;
+  font-weight: 800; letter-spacing: -0.035em; line-height: 1.0;
+  font-size: clamp(34px, 6vw, 86px); text-transform: uppercase;
+}
+.ol { color: var(--fg); }
+.bl {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.accent { color: var(--accent); }
+
+/* ═══ OVERLAY / MAIN ═══ */
+.overlay { position: relative; z-index: 2; }
+
+/* ═══ SECTION SHELL + reveals ═══ */
+.section { position: relative; padding: clamp(90px, 12vw, 180px) var(--pad); }
+.section-inner { position: relative; }
+.reveal { opacity: 0; transform: translateY(40px) scale(0.97); }
+
+/* ═══ HERO ═══ */
+.hero {
+  min-height: 100svh; display: flex; flex-direction: column;
+  justify-content: flex-end; padding: clamp(90px, 12vw, 180px) var(--pad) clamp(60px, 8vw, 120px);
+  position: relative;
+}
+.hero__eyebrow {
+  font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--faint); margin-bottom: 20px; font-weight: 600;
+}
+.hero__foot { display: flex; flex-direction: column; gap: 18px; margin-top: clamp(20px, 3vw, 40px); }
+.hero__lede { font-size: clamp(15px, 1.8vw, 20px); line-height: 1.7; color: var(--faint); max-width: 560px; }
+.scrollcue {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint);
+}
+.scrollcue .bar {
+  display: block; width: 32px; height: 1px; background: var(--faint);
+  animation: scroll-bar 1.6s ease-in-out infinite;
+}
+@keyframes scroll-bar {
+  0%, 100% { transform: scaleX(1); opacity: 1; }
+  50%       { transform: scaleX(0.3); opacity: 0.4; }
+}
+
+/* ═══ ZONE / IMMERSIVE STORY ═══ */
+.zone { position: relative; min-height: 240svh; }
+.zone__pin {
+  position: sticky; top: 0; height: 100svh;
+  display: flex; align-items: center; justify-content: center; flex-direction: column;
+  gap: 16px; overflow: hidden;
+}
+.zone__step {
+  position: absolute; display: flex; flex-direction: column; align-items: center;
+  text-align: center; gap: 12px; padding: 0 var(--pad); opacity: 0;
+}
+.zone__step .big {
+  font-family: 'Noto Serif TC', serif; font-weight: 900;
+  font-size: clamp(36px, 9vw, 130px); letter-spacing: -0.04em; line-height: 0.95;
+}
+.zone__step .sub { font-size: clamp(14px, 2vw, 20px); color: var(--faint); }
+.zone__hint {
+  position: absolute; bottom: 32px;
+  font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint);
+  animation: blink 1.8s ease-in-out infinite;
+}
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+
+/* ═══ ABOUT SECTION ═══ */
+.about-grid {
+  display: grid; grid-template-columns: 1fr 1.6fr;
+  gap: clamp(40px, 8vw, 120px); align-items: start;
+  padding: clamp(20px, 4vw, 60px) 0;
+}
+@media (max-width: 720px) { .about-grid { grid-template-columns: 1fr; gap: 32px; } }
+.about-lead {
+  font-size: clamp(15px, 1.6vw, 19px); line-height: 1.85;
+  color: var(--fg); opacity: 0.72; max-width: 540px; margin-bottom: 40px;
+}
+.about-stats { display: flex; gap: clamp(24px, 5vw, 60px); margin-bottom: 36px; }
+.about-stat  { display: flex; flex-direction: column; gap: 4px; }
+.about-stat__num {
+  font-family: 'Noto Serif TC', serif; font-size: clamp(32px, 5vw, 56px);
+  font-weight: 900; letter-spacing: -0.04em; line-height: 1;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent3) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.about-stat__label {
+  font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--fg); opacity: 0.42;
+}
+.about-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.about-tags span {
+  font-size: 12px; padding: 5px 14px; border-radius: 100px;
+  border: 1px solid var(--hair); color: var(--fg); opacity: 0.6; letter-spacing: 0.05em;
+}
+
+/* ═══ MASKED VIDEO REVEAL ═══ */
+.reveal-wrap { position: relative; height: 220vh; }
+.reveal-sticky {
+  position: sticky; top: 0; height: 100svh; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: #050608;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 18%, black 82%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, black 18%, black 82%, transparent 100%);
+}
+.reveal-mask {
+  position: absolute; inset: 0; overflow: hidden;
+  clip-path: circle(11vmax at 50% 50%);
+  display: flex; align-items: center; justify-content: center;
+}
+.reveal-mask video {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  width: 100vw; height: 56.25vw; min-height: 100vh; min-width: 177.78vh;
+  object-fit: cover; border: 0; pointer-events: none;
+}
+.reveal-label {
+  position: absolute; z-index: 4; bottom: 18%; left: var(--pad);
+  font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(255,255,255,0.5);
+}
+.showreel-placeholder {
+  position: absolute; inset: 0; z-index: 5;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 12px; pointer-events: none; transition: opacity 0.6s;
+}
+.showreel-placeholder__text {
+  font-family: 'Courier New', monospace; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase;
+  color: rgba(255,255,255,0.28); background: rgba(0,0,0,0.35); padding: 10px 20px;
+  border-radius: 6px; border: 1px solid rgba(255,255,255,0.12);
+}
+
+/* ═══ WORK / GALLERY ═══ */
+#work { padding: 0; }
+.work-intro { padding: clamp(80px,10vw,160px) var(--pad) clamp(40px,5vw,80px); max-width: var(--maxw); margin: 0 auto 0 clamp(80px, 18vw, 320px); }
+.work-head-bar { padding: clamp(80px,10vw,160px) var(--pad) clamp(40px,5vw,80px); margin-left: clamp(24px, 6vw, 80px); }
+.work-lead { font-size: clamp(15px,1.8vw,21px); line-height: 1.75; color: var(--faint); max-width: 480px; margin-top: 16px; }
+
+/* Gallery — straight panels, no skew */
+.work-gallery-clip { position: relative; z-index: 2; overflow: hidden; width: 100%; margin: 0 auto; }
+.work-gallery { height: 100svh; display: flex; gap: 0; width: 100%; background: transparent; }
+.acc-panel {
+  position: relative; flex: 1; overflow: hidden;
+  transition: flex 0.55s cubic-bezier(0.16,1,0.3,1); cursor: pointer;
+}
+.acc-inner {
+  position: absolute; inset: 0; background-size: cover; background-position: center;
+  transition: filter 0.55s cubic-bezier(0.16,1,0.3,1), transform 0.55s cubic-bezier(0.16,1,0.3,1);
+  will-change: filter, transform;
+}
+.acc-panel:hover .acc-inner { transform: scale(1.05); }
+.acc-inner::after {
+  content: ''; position: absolute; inset: 0; z-index: 2;
+  background: linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.15) 55%, transparent 100%);
+}
+.work-gallery:not(:hover) .acc-panel .acc-inner { filter: brightness(0.8) saturate(0.9); }
+.acc-panel:hover { flex: 2.8; }
+.acc-panel:hover .acc-inner { filter: brightness(1.0) saturate(1.1); }
+.acc-label {
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 3;
+  padding: 24px 22px 28px; display: flex; flex-direction: column; gap: 6px;
+}
+.acc-label__num { font-size: 10px; letter-spacing: 0.14em; color: rgba(255,255,255,0.38); }
+.acc-label__title { font-size: clamp(14px,1.5vw,20px); font-weight: 700; color: #fff; line-height: 1.2; }
+.acc-label__tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.acc-label__tags span {
+  font-size: 10px; padding: 3px 9px; border-radius: 100px;
+  border: 1px solid rgba(255,255,255,0.22); color: rgba(255,255,255,0.6);
+  letter-spacing: 0.06em;
+}
+.acc-video {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0;
+  opacity: 0; transition: opacity 0.5s ease;
+}
+.acc-poster {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1;
+  transition: opacity 0.5s ease; opacity: 1;
+}
+.acc-panel:hover .acc-poster { opacity: 0; }
+.acc-panel:hover .acc-video { opacity: 1; }
+.acc-video-placeholder { display: none; }
+.acc-video-placeholder {
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 3;
+  padding: 10px 14px; font-family: 'Courier New', monospace; font-size: 9px;
+  letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.18);
+  pointer-events: none; transition: opacity 0.6s;
+}
+
+/* Gallery colour backgrounds (placeholder until video loads) */
+.acc-inner.m1 { background: linear-gradient(145deg, #1a0533 0%, #2d0b52 100%); }
+.acc-inner.m2 { background: linear-gradient(145deg, #031524 0%, #082d48 100%); }
+.acc-inner.m3 { background: linear-gradient(145deg, #1a2200 0%, #2d3d00 100%); }
+.acc-inner.m4 { background: linear-gradient(145deg, #240a00 0%, #3d1200 100%); }
+
+/* Gallery groups */
+.gallery-group { position: relative; }
+.gallery-group + .gallery-group { margin-top: 4px; }
+.gallery-group .work-gallery { height: 62svh; }
+@media (max-width: 720px) { .gallery-group .work-gallery { height: 52svh; } }
+.gallery-group__label {
+  position: relative; z-index: 2;
+  display: flex; align-items: center; gap: 18px;
+  padding: 32px var(--pad) 12px;
+  max-width: var(--maxw); margin: 0 auto;
+}
+.gallery-group__label::after {
+  content: ''; flex: 1; height: 1px; background: var(--hair);
+}
+
+/* ═══ STORY / STATS / TOOLS ═══ */
+.story { position: relative; }
+.story-inner { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(40px,8vw,120px); align-items: start; }
+@media (max-width: 720px) { .story-inner { grid-template-columns: 1fr; } }
+.story-text { display: flex; flex-direction: column; gap: 28px; }
+.stats { display: flex; gap: clamp(24px,5vw,60px); margin-top: 28px; flex-wrap: wrap; }
+.stat { display: flex; flex-direction: column; gap: 4px; margin-bottom: 0; }
+.stat .n {
+  font-family: 'Noto Serif TC', serif; font-size: clamp(40px,7vw,80px);
+  font-weight: 900; letter-spacing: -0.04em; line-height: 0.9;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.stat .l { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+/* ── Liquid Glass about card ── */
+.about-glass-card {
+  background: var(--lg-bg);
+  border: 1px solid var(--lg-brd);
+  border-radius: 24px;
+  backdrop-filter: var(--lg-blur);
+  -webkit-backdrop-filter: var(--lg-blur);
+  padding: clamp(24px,4vw,40px);
+  box-shadow:
+    inset 0 1.5px 0 var(--lg-hi),
+    0 12px 40px var(--lg-shd);
+  position: relative; overflow: hidden;
+}
+.about-glass-card::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg,
+    rgba(255,255,255,0.10) 0%,
+    rgba(255,255,255,0.02) 50%,
+    transparent 100%);
+  pointer-events: none; border-radius: inherit;
+}
+
+/* ── Gradient Bar ── */
+.tools { display: flex; flex-direction: column; gap: 20px; }
+.tools__row { display: flex; flex-direction: column; gap: 8px; }
+.tools__row label {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 13px; letter-spacing: 0.04em; color: var(--fg);
+  font-weight: 600; opacity: 0.85;
+}
+.tools__row label .pct {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+  background: linear-gradient(90deg, var(--accent), var(--accent3));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.tools__bar {
+  height: 7px;
+  background: rgba(255,255,255,0.07);
+  border-radius: 100px;
+  overflow: hidden;
+  position: relative;
+}
+.tools__bar::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0.04) 0%,
+    rgba(255,255,255,0.10) 100%);
+  border-radius: inherit;
+}
+.tools__bar .fill {
+  height: 100%; width: 0;
+  background: linear-gradient(90deg,
+    var(--accent) 0%,
+    var(--accent3) 60%,
+    var(--accent2) 100%);
+  border-radius: 100px;
+  position: relative;
+  box-shadow: 0 0 10px rgba(29,110,245,0.45), 0 0 24px rgba(168,85,247,0.20);
+}
+/* Shimmer on bar */
+.tools__bar .fill::after {
+  content: '';
+  position: absolute; top: 0; left: 0; bottom: 0;
+  width: 60%; border-radius: inherit;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+  animation: bar-shimmer 2.4s ease-in-out infinite;
+}
+@keyframes bar-shimmer {
+  0%   { transform: translateX(-120%); opacity: 0; }
+  40%  { opacity: 1; }
+  100% { transform: translateX(260%); opacity: 0; }
+}
+
+/* ── Liquid Glass chips ── */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.chips span {
+  font-size: 12px; padding: 6px 16px; border-radius: 100px;
+  border: 1px solid var(--lg-brd);
+  background: var(--lg-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: var(--fg); opacity: 0.88;
+  letter-spacing: 0.05em; font-weight: 500;
+  box-shadow: inset 0 1px 0 var(--lg-hi), 0 2px 8px var(--lg-shd);
+  transition: background 0.2s, opacity 0.2s;
+}
+.chips span:hover { background: rgba(255,255,255,0.16); opacity: 1; }
+
+/* ═══ VERTICAL TIMELINE (編年史) ═══ */
+.tl-head { max-width: var(--maxw); margin: 0 auto clamp(48px,7vw,90px); padding: 0 var(--pad); text-align: center; }
+.tl-head .h2 { margin-top: 16px; }
+.tl-head .tl-lead { font-size: clamp(15px,1.8vw,19px); line-height: 1.7; color: var(--faint); max-width: 520px; margin: 18px auto 0; }
+
+.timeline { position: relative; max-width: 980px; margin: 0 auto; padding: 0 var(--pad); }
+/* central spine — faint track */
+.timeline::before {
+  content: ''; position: absolute; top: 6px; bottom: 6px; left: 50%;
+  width: 2px; transform: translateX(-50%);
+  background: rgba(232,234,242,0.10);
+}
+/* bright progress line that grows with scroll */
+.tl-progress {
+  position: absolute; top: 6px; left: 50%; width: 2px; margin-left: -1px;
+  height: 100%; transform-origin: top center; transform: scaleY(0);
+  background: linear-gradient(180deg, var(--accent) 0%, var(--accent3) 50%, var(--accent2) 100%);
+  box-shadow: 0 0 14px rgba(120,90,255,0.55);
+  z-index: 1;
+}
+
+/* year badge centred on the spine */
+.tl-year {
+  position: relative; z-index: 3; width: max-content; margin: 0 auto;
+  padding: 7px 22px; border-radius: 100px;
+  font-family: 'Inter','Noto Sans TC',sans-serif;
+  font-size: 14px; font-weight: 800; letter-spacing: 0.06em; color: var(--fg);
+  background: var(--lg-bg); border: 1px solid var(--lg-brd);
+  backdrop-filter: var(--lg-blur); -webkit-backdrop-filter: var(--lg-blur);
+  box-shadow: inset 0 1.5px 0 var(--lg-hi), 0 8px 28px var(--lg-shd);
+}
+.tl-year:not(:first-child) { margin-top: clamp(40px,5vw,64px); }
+.tl-year + .tl-item { margin-top: clamp(28px,4vw,44px); }
+
+/* each event sits on one half — NO glass, floating text */
+.tl-item { position: relative; width: 50%; box-sizing: border-box; margin-bottom: clamp(34px,5vw,56px); }
+.tl-item.left  { left: 0;    padding-right: clamp(34px,4.5vw,60px); text-align: right; }
+.tl-item.right { left: 50%;  padding-left:  clamp(34px,4.5vw,60px); text-align: left; }
+
+/* node dot on the spine + pulse ring */
+.tl-node {
+  position: absolute; top: 8px; width: 15px; height: 15px; border-radius: 50%;
+  background: var(--bg); z-index: 3;
+  border: 3px solid var(--accent);
+  box-shadow: 0 0 0 4px rgba(29,110,245,0.12), 0 0 18px rgba(29,110,245,0.55);
+}
+.tl-node::after {
+  content: ''; position: absolute; inset: -3px; border-radius: 50%;
+  border: 2px solid var(--accent); opacity: 0;
+}
+.tl-item.left  .tl-node { right: -7.5px; }
+.tl-item.right .tl-node { left:  -7.5px; }
+.tl-item.right .tl-node { border-color: var(--accent3); box-shadow: 0 0 0 4px rgba(168,85,247,0.12), 0 0 18px rgba(168,85,247,0.55); }
+.tl-item.right .tl-node::after { border-color: var(--accent3); }
+.tl-item.in-view .tl-node::after { animation: tl-pulse 2.4s ease-out infinite; }
+@keyframes tl-pulse {
+  0%   { opacity: 0.7; transform: scale(1); }
+  70%  { opacity: 0;   transform: scale(2.6); }
+  100% { opacity: 0;   transform: scale(2.6); }
+}
+
+/* horizontal branch connector spine → text */
+.tl-branch {
+  position: absolute; top: 15px; height: 2px; width: clamp(20px,3vw,42px);
+  background: linear-gradient(90deg, var(--accent), transparent);
+  transform: scaleX(0); z-index: 1;
+}
+.tl-item.left  .tl-branch { right: 0; transform-origin: right center; background: linear-gradient(270deg, var(--accent), transparent); }
+.tl-item.right .tl-branch { left: 0;  transform-origin: left center;  background: linear-gradient(90deg, var(--accent3), transparent); }
+
+/* event content — plain, no card */
+.tl-card { display: inline-block; text-align: left; vertical-align: top; max-width: 420px; position: relative; }
+.tl-date { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; color: var(--accent); margin-bottom: 6px; }
+.tl-item.right .tl-date { color: var(--accent3); }
+.tl-title {
+  font-family: 'Noto Serif TC', serif; font-size: clamp(19px,2.2vw,24px);
+  font-weight: 700; letter-spacing: -0.02em; line-height: 1.25;
+  position: relative; display: inline-block; padding-bottom: 8px;
+}
+.tl-title::after {
+  content: ''; position: absolute; left: 0; bottom: 0; height: 2px; width: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent3));
+  transform: scaleX(0); transform-origin: left center; border-radius: 2px;
+}
+.tl-item.in-view .tl-title::after { animation: tl-underline 0.7s 0.25s cubic-bezier(.7,0,.2,1) forwards; }
+@keyframes tl-underline { to { transform: scaleX(1); } }
+
+/* bullet list with rich markers */
+.tl-list { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 11px; }
+.tl-list li {
+  position: relative; padding-left: 24px;
+  font-size: 14px; line-height: 1.62; color: rgba(232,234,242,0.66);
+  opacity: 0; transform: translateX(-12px);
+  transition: color 0.3s;
+}
+.tl-list li::before {
+  content: ''; position: absolute; left: 2px; top: 8px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent3));
+  box-shadow: 0 0 9px rgba(80,110,255,0.6);
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+.tl-list li:hover { color: var(--fg); }
+.tl-list li:hover::before { transform: scale(1.45); box-shadow: 0 0 14px rgba(120,90,255,0.95); }
+.tl-item.in-view .tl-list li { animation: tl-bullet 0.6s cubic-bezier(.5,0,.1,1) forwards; }
+.tl-item.in-view .tl-list li:nth-child(1) { animation-delay: 0.30s; }
+.tl-item.in-view .tl-list li:nth-child(2) { animation-delay: 0.42s; }
+.tl-item.in-view .tl-list li:nth-child(3) { animation-delay: 0.54s; }
+.tl-item.in-view .tl-list li:nth-child(4) { animation-delay: 0.66s; }
+@keyframes tl-bullet { to { opacity: 1; transform: translateX(0); } }
+
+.tl-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.tl-item.left .tl-tags { justify-content: flex-end; }
+.tl-tags span { font-size: 10px; padding: 3px 9px; border-radius: 100px; border: 1px solid var(--hair); color: var(--faint); letter-spacing: 0.05em; white-space: nowrap; }
+
+/* scroll-reveal initial state */
+.tl-item, .tl-year { opacity: 0; }
+
+@media (max-width: 760px) {
+  .timeline::before { left: 9px; }
+  .tl-progress { left: 9px; margin-left: -1px; }
+  .tl-year { margin-left: 0; margin-right: auto; }
+  .tl-item, .tl-item.left, .tl-item.right {
+    width: 100%; left: 0; text-align: left;
+    padding-left: 34px; padding-right: 0;
+  }
+  .tl-item.left .tl-node, .tl-item.right .tl-node { left: 2px; right: auto; }
+  .tl-item.left .tl-branch, .tl-item.right .tl-branch { left: 11px; right: auto; transform-origin: left center; }
+  .tl-item.left .tl-tags { justify-content: flex-start; }
+  .tl-card { max-width: 100%; }
+}
+
+/* ═══ CARDS ═══ */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.card {
+  border-radius: 18px; overflow: hidden; position: relative;
+  background: var(--glass); border: 1px solid var(--glass-brd);
+  transition: transform 0.4s var(--ease-spring), box-shadow 0.4s;
+}
+.card:hover { transform: translateY(-6px); box-shadow: 0 20px 50px rgba(0,0,0,0.12); }
+.card__media { aspect-ratio: 16/9; background: var(--hair); overflow: hidden; }
+.card__media img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s var(--ease-spring); }
+.card:hover .card__media img { transform: scale(1.06); }
+.card__body { padding: 20px 22px 24px; display: flex; flex-direction: column; gap: 8px; }
+.card__title { font-size: 1rem; font-weight: 700; line-height: 1.3; }
+.card__sub { font-size: 0.82rem; color: var(--faint); line-height: 1.55; }
+.card__tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.card__tags span {
+  font-size: 10px; padding: 3px 9px; border-radius: 100px;
+  border: 1px solid var(--hair); color: var(--faint); letter-spacing: 0.06em;
+}
+
+/* ═══ FOOTER ═══ */
+.foot {
+  padding: clamp(80px,12vw,180px) var(--pad) clamp(40px,6vw,80px);
+  position: relative; z-index: 2;
+  border-top: 1px solid var(--hair);
+}
+.foot__big {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 800; text-transform: uppercase; letter-spacing: -0.04em; line-height: 0.96;
+  font-size: clamp(52px,12vw,180px); color: var(--fg); margin-bottom: clamp(40px,6vw,80px);
+}
+.foot__row { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 32px; align-items: flex-start; padding-bottom: 32px; border-bottom: 1px solid var(--hair); margin-bottom: 24px; }
+.foot__info { display: flex; flex-direction: column; gap: 8px; }
+.foot__contact { display: flex; flex-direction: column; gap: 10px; }
+.foot__contact a { font-size: 0.9rem; color: var(--fg); text-decoration: none; display: flex; align-items: center; gap: 8px; }
+.foot__contact a:hover { color: var(--accent); }
+.ic { font-size: 1rem; }
+.foot__legal { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 11px; color: var(--faint); letter-spacing: 0.06em; }
+
+/* ═══ GALLERY GROUPS / VIDEO placeholder ═══ */
+.gallery-group__label::after { content: ''; flex: 1; height: 1px; background: var(--hair); }
+
+/* ═══ RESPONSIVE ═══ */
+@media (max-width: 720px) {
+  .acc-inner { inset: 0; }
+  .acc-label__title { font-size: 16px; }
+  .acc-label { padding: 16px 16px 22px; }
+  .foot__big { font-size: clamp(40px, 10vw, 120px); }
+  .foot__row { flex-direction: column; }
+}
+  </style>
+</head>
+<body>
+
+  <!-- VFX-letter reveal: white strokes on black curtain, then curtain fades -->
+  <svg id="t-reveal-svg" aria-hidden="true" style="
+    position:fixed;inset:0;width:100vw;height:100svh;z-index:9999;
+    pointer-events:none;overflow:hidden;display:block;">
+    <defs>
+      <mask id="t-reveal-mask">
+        <rect width="100%" height="100%" fill="white"/>
+        <g id="t-group">
+          <line id="sv-l" x1="-134" y1="-82" x2="-108" y2="82"
+            stroke="black" stroke-width="20" stroke-linecap="round"
+            stroke-dasharray="172" stroke-dashoffset="172"/>
+          <line id="sv-r" x1="-82"  y1="-82" x2="-108" y2="82"
+            stroke="black" stroke-width="20" stroke-linecap="round"
+            stroke-dasharray="172" stroke-dashoffset="172"/>
+          <line id="sf-s" x1="-28" y1="-82" x2="-28" y2="82"
+            stroke="black" stroke-width="20" stroke-linecap="round"
+            stroke-dasharray="168" stroke-dashoffset="168"/>
+          <line id="sf-t" x1="-28" y1="-82" x2="30" y2="-82"
+            stroke="black" stroke-width="20" stroke-linecap="round"
+            stroke-dasharray="62" stroke-dashoffset="62"/>
+          <line id="sf-m" x1="-28" y1="-6"  x2="18"  y2="-6"
+            stroke="black" stroke-width="20" stroke-linecap="round"
+            stroke-dasharray="50" stroke-dashoffset="50"/>
+          <line id="sx-1" x1="83"  y1="-82" x2="131" y2="82"
+            stroke="black" stroke-width="20" stroke-linecap="round"
+            stroke-dasharray="172" stroke-dashoffset="172"/>
+          <line id="sx-2" x1="131" y1="-82" x2="83"  y2="82"
+            stroke="black" stroke-width="20" stroke-linecap="round"
+            stroke-dasharray="172" stroke-dashoffset="172"/>
+        </g>
+      </mask>
+    </defs>
+    <rect id="t-curtain" x="0" y="0" width="100%" height="100%"
+      fill="#07070f" mask="url(#t-reveal-mask)"/>
+  </svg>
+  <!-- 白色 Solid 層：VFX 描繪期間維持不透明，放大至一半時淡出 -->
+  <div id="vfx-white" style="position:fixed;inset:0;z-index:9998;background:#ffffff;pointer-events:none;"></div>
+
+  <!-- 流體擾動：WebGL 位移圖 canvas -->
+  <!-- SVG 濾鏡：feImage 取 WebGL canvas → feDisplacementMap 偏移 -->
+  <svg id="fluid-svg" xmlns="http://www.w3.org/2000/svg"
+       style="position:fixed;width:0;height:0;overflow:hidden;pointer-events:none;">
+    <defs>
+      <filter id="fluid-filter"
+              x="-8%" y="-8%" width="116%" height="116%"
+              color-interpolation-filters="sRGB">
+        <feImage id="fluid-fe-image" result="disp-map" preserveAspectRatio="none"/>
+        <feDisplacementMap in="SourceGraphic" in2="disp-map"
+                           id="fluid-fe-disp" scale="200"
+                           xChannelSelector="R" yChannelSelector="G"/>
+      </filter>
+    </defs>
+  </svg>
+
+  <canvas id="gl"></canvas>
+
+  <!-- ░░░░░░░░ FLOATING PILL NAVBAR ░░░░░░░░ -->
+  <nav class="nav">
+    <a class="logo" href="#top">邱立璟<span class="dot">·</span><span class="tag-sub">個人作品集展示</span></a>
+
+    <div class="nav-right nav-desktop">
+      <div class="seg" role="group" aria-label="Language">
+        <button data-lang-btn="zh" aria-pressed="true">中</button>
+        <button data-lang-btn="en" aria-pressed="false">EN</button>
+      </div>
+      <a class="pill" href="#work" data-i18n="nav.work">作品</a>
+      <a class="pill pill--cta" href="#contact" data-i18n="nav.talk">聊聊合作</a>
+    </div>
+
+    <div class="nav-right nav-mobile">
+      <button id="burger" class="pill pill--icon" aria-label="Menu" aria-expanded="false">☰</button>
+    </div>
+  </nav>
+
+  <!-- mobile fullscreen menu -->
+  <div id="mob" class="mob">
+    <a href="#work"><span data-i18n="nav.work">作品</span></a>
+    <a href="#about"><span data-i18n="nav.about">關於</span></a>
+    <a href="#contact"><span data-i18n="nav.contact">聯絡</span></a>
+    <a href="https://pda.104.com.tw/profile/share/a6QT5YhnOn0Py0BZLnzYDajdUbz7f9mg" target="_blank" rel="noopener"><span class="accent" data-i18n="nav.resume">履歷表</span></a>
+    <a href="https://youtu.be/cRUi3zGelNY?si=vk4e2cp7sjdndCo1" target="_blank" rel="noopener"><span class="accent" data-i18n="nav.portfolio">作品集</span></a>
+    <div class="mob__contact">
+      <div>0963-471-107</div>
+      <div>lijingchiu@yahoo.com.tw</div>
+      <div class="seg" style="margin-top:14px; align-self:flex-start;" role="group" aria-label="Language">
+        <button data-lang-btn="zh" aria-pressed="true">中文</button>
+        <button data-lang-btn="en" aria-pressed="false">EN</button>
+      </div>
+      </div><!-- /.work-gallery -->
+    </div><!-- /.work-gallery-clip -->
+  </div>
+
+  <main class="overlay" id="top">
+
+    <!-- ░░░░░░░░ HERO — macro typography ░░░░░░░░ -->
+    <header class="hero" data-screen-label="Hero">
+      <div class="hero__eyebrow" data-i18n="hero.eyebrow">VFX ARTIST · UNITY3D SHADER</div>
+      <h1 class="macro">
+        <span class="row"><span>Lijing</span></span>
+        <span class="row"><span>Chiu</span></span>
+        <span class="row"><span class="bl">VFX.</span></span>
+      </h1>
+      <div class="hero__foot">
+        <p class="hero__lede" data-i18n="hero.lede">遊戲特效 × 沉浸式展覽 × AI 輔助開發 — 以 Particle System 與 Shader 打造令人印象深刻的視覺體驗。</p>
+        <div class="scrollcue"><span class="bar"></span><span data-i18n="scroll">SCROLL</span></div>
+      </div>
+    </header>
+
+    <!-- ░░░░░░░░ IMMERSIVE SCROLL STORY (pinned) ░░░░░░░░ -->
+    <section id="zone" class="zone" data-screen-label="Immersive story">
+      <div class="zone__pin">
+        <span class="kicker" style="position:absolute;top:14svh;left:50%;transform:translateX(-50%);color:#7ea6ff;" data-i18n="zone.k">深度滾動敘事</span>
+
+        <div class="zone__step">
+          <div class="big"><span data-i18n="zone.1a">穿越</span> <span class="ol" data-i18n="zone.1b">畫面</span></div>
+          <div class="sub" data-i18n="zone.1s">滾動，進入特效的宇宙。</div>
+        </div>
+        <div class="zone__step">
+          <div class="big"><span data-i18n="zone.2a">PARTICLE</span> <span class="ol" data-i18n="zone.2b">SYSTEM</span></div>
+          <div class="sub" data-i18n="zone.2s">粒子、光絲與動態，凝聚成情感的力量。</div>
+        </div>
+        <div class="zone__step">
+          <div class="big"><span data-i18n="zone.3a">SHADER</span> <span class="ol" data-i18n="zone.3b">ARTISTRY</span></div>
+          <div class="sub" data-i18n="zone.3s">每一道光澤，皆由程式雕琢而成。</div>
+        </div>
+
+        <div class="zone__hint" data-i18n="zone.hint">繼續滾動</div>
+      </div>
+    </section>
+
+    <!-- ░░░░░░░░ VERTICAL TIMELINE / 編年史 ░░░░░░░░ -->
+    <section id="timeline" class="section" data-screen-label="Timeline">
+      <div class="tl-head">
+        <div class="kicker" data-i18n="tl.k">創作歷程</div>
+        <h2 class="h2" data-i18n="tl.title">一路走來的軌跡</h2>
+        <p class="tl-lead" data-i18n="tl.lead">從第一行 Shader 到沉浸式展演，每一步都是對視覺極限的探索。</p>
+      </div>
+
+      <div class="timeline">
+        <div class="tl-progress"></div>
+        <div class="tl-year">2020</div>
+
+        <div class="tl-item left">
+          <span class="tl-node"></span><span class="tl-branch"></span>
+          <div class="tl-card">
+            <div class="tl-date" data-i18n="tl.d1">2020 · 啟程</div>
+            <div class="tl-title" data-i18n="tl.t1">踏入即時渲染世界</div>
+            <ul class="tl-list">
+              <li data-i18n="tl.l1a">投入遊戲特效與即時渲染領域</li>
+              <li data-i18n="tl.l1b">從 Unity 粒子系統開始，建立對動態視覺的直覺</li>
+              <li data-i18n="tl.l1c">活用各項即時渲染工具</li>
+            </ul>
+            <div class="tl-tags"><span>Unity3D</span><span>Particle</span></div>
+          </div>
+        </div>
+
+        <div class="tl-year">2021</div>
+
+        <div class="tl-item right">
+          <span class="tl-node"></span><span class="tl-branch"></span>
+          <div class="tl-card">
+            <div class="tl-date" data-i18n="tl.d2">2021 · 首個商業專案</div>
+            <div class="tl-title" data-i18n="tl.t2">手遊技能特效製作</div>
+            <ul class="tl-list">
+              <li data-i18n="tl.l2a">參與商業手遊的技能與打擊特效</li>
+              <li data-i18n="tl.l2b">在效能限制下做出最具張力的畫面</li>
+              <li data-i18n="tl.l2c">建立可重用的特效資產流程</li>
+            </ul>
+            <div class="tl-tags"><span>VFX Graph</span><span>Mobile</span></div>
+          </div>
+        </div>
+
+        <div class="tl-year">2022</div>
+
+        <div class="tl-item left">
+          <span class="tl-node"></span><span class="tl-branch"></span>
+          <div class="tl-card">
+            <div class="tl-date" data-i18n="tl.d3">2022 · 技術深耕</div>
+            <div class="tl-title" data-i18n="tl.t3">深入 Shader 開發</div>
+            <ul class="tl-list">
+              <li data-i18n="tl.l3a">自學 HLSL 與 Shader Graph</li>
+              <li data-i18n="tl.l3b">從零打造可重用的材質與光效系統</li>
+              <li data-i18n="tl.l3c">鑽研數學與光照模型原理</li>
+            </ul>
+            <div class="tl-tags"><span>HLSL</span><span>Shader Graph</span></div>
+          </div>
+        </div>
+
+        <div class="tl-item right">
+          <span class="tl-node"></span><span class="tl-branch"></span>
+          <div class="tl-card">
+            <div class="tl-date" data-i18n="tl.d4">2023 · 沉浸式展演</div>
+            <div class="tl-title" data-i18n="tl.t4">互動裝置與投影</div>
+            <ul class="tl-list">
+              <li data-i18n="tl.l4a">參與沉浸式展覽製作</li>
+              <li data-i18n="tl.l4b">將即時特效延伸到大型投影與互動裝置</li>
+              <li data-i18n="tl.l4c">整合感測器與即時互動邏輯</li>
+            </ul>
+            <div class="tl-tags"><span>Projection</span><span>Interactive</span></div>
+          </div>
+        </div>
+
+        <div class="tl-year">2024</div>
+
+        <div class="tl-item left">
+          <span class="tl-node"></span><span class="tl-branch"></span>
+          <div class="tl-card">
+            <div class="tl-date" data-i18n="tl.d5">2024 · 工作流革新</div>
+            <div class="tl-title" data-i18n="tl.t5">導入 AI 輔助開發</div>
+            <ul class="tl-list">
+              <li data-i18n="tl.l5a">將 AI 工具融入特效與前端工作流</li>
+              <li data-i18n="tl.l5b">大幅提升從概念到成品的迭代速度</li>
+              <li data-i18n="tl.l5c">探索程序化生成與自動化流程</li>
+            </ul>
+            <div class="tl-tags"><span>AI Workflow</span><span>Realtime</span></div>
+          </div>
+        </div>
+
+        <div class="tl-year">2025</div>
+
+        <div class="tl-item right">
+          <span class="tl-node"></span><span class="tl-branch"></span>
+          <div class="tl-card">
+            <div class="tl-date" data-i18n="tl.d6">2025 · 此刻</div>
+            <div class="tl-title" data-i18n="tl.t6">打造個人作品集</div>
+            <ul class="tl-list">
+              <li data-i18n="tl.l6a">整合歷年作品與技術積累</li>
+              <li data-i18n="tl.l6b">以這個網站呈現屬於自己的視覺語言</li>
+              <li data-i18n="tl.l6c">持續探索 WebGL 與互動體驗</li>
+            </ul>
+            <div class="tl-tags"><span>Portfolio</span><span>WebGL</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ░░░░░░░░ ABOUT / INTRO SECTION ░░░░░░░░ -->
+    <section id="about" class="section" data-screen-label="About">
+      <div style="max-width:var(--maxw);margin:0 auto;padding:0 var(--pad);">
+        <div class="about-grid">
+          <div class="about-left">
+            <div class="kicker" data-i18n="about.k">關於我</div>
+            <h2 class="h2" style="margin-top:18px;" data-i18n="about.title">用視覺說話<br>用技術實現</h2>
+          </div>
+          <div class="about-right">
+            <p class="about-lead" data-i18n="about.lead">我是邱立璟，專注於即時渲染特效與沉浸式視覺體驗。擁有遊戲特效、Shader 開發與互動裝置的實戰經驗，曾參與多個商業專案與展覽製作。</p>
+            <div class="about-stats">
+              <div class="about-stat">
+                <span class="about-stat__num">5+</span>
+                <span class="about-stat__label" data-i18n="about.s1">年實戰經驗</span>
+              </div>
+              <div class="about-stat">
+                <span class="about-stat__num">20+</span>
+                <span class="about-stat__label" data-i18n="about.s2">完成專案</span>
+              </div>
+              <div class="about-stat">
+                <span class="about-stat__num">3</span>
+                <span class="about-stat__label" data-i18n="about.s3">核心技術</span>
+              </div>
+            </div>
+            <div class="about-tags">
+              <span>Unity3D</span><span>VFX Graph</span><span>HLSL</span>
+              <span>Shader Graph</span><span>Realtime Rendering</span><span>Immersive XR</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ░░░░░░░░ MASKED VIDEO REVEAL ░░░░░░░░ -->
+    <section class="reveal-wrap" data-screen-label="Showreel reveal">
+      <div class="reveal-sticky">
+        <div class="reveal-label" data-i18n="reveal.label">SHOWREEL</div>
+        <div class="reveal-mask">
+          <video
+            id="showreel-video"
+            autoplay muted loop playsinline
+            style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);min-width:177.78vh;min-height:100vh;width:100vw;height:56.25vw;object-fit:cover;pointer-events:none;"
+          >
+            <source src="https://pub-c1d474e0b6a24726ae02236abb08ff31.r2.dev/Portfolio/%E7%99%BD%E9%9B%AA%E7%B5%82%E7%B5%90%E6%8A%80.mp4" type="video/mp4" />
+          </video>
+        </div>
+        <script>var _srp=document.getElementById('showreel-placeholder'); if(_srp) setTimeout(function(){_srp.style.display='none';},1500);</script>
+      </div>
+    </section>
+
+    <!-- ░░░░░░░░ SKEWED ACCORDION GALLERY ░░░░░░░░ -->
+    <div id="work" data-screen-label="Work">
+      <!-- Section heading -->
+      <div class="work-head-bar reveal">
+        <div>
+          <span class="kicker" data-i18n="work.k">精選作品</span>
+          <h2 class="h2" data-i18n="work.title">作品集</h2>
+        </div>
+        <p class="lead" data-i18n="work.lead">遊戲特效、沉浸式展覽與實驗性視覺專案。</p>
+      </div>
+      <!-- Gallery — 3 groups -->
+
+      <!-- ── Group 1: 遊戲特效 ── -->
+      <div class="gallery-group">
+        <div class="gallery-group__label">
+          <span class="kicker" data-i18n="group.1k">遊戲特效</span>
+        </div>
+        <div class="work-gallery-clip">
+          <div class="work-gallery">
+            <div class="acc-panel">
+              <div class="acc-inner m1">
+                <img class="acc-poster" data-poster="" alt="" />
+                <video class="acc-video" data-hls="videos/work-01.m3u8" muted loop playsinline preload="none"></video>
+                <div class="acc-video-placeholder">work-01.m3u8</div>
+              </div>
+              <div class="acc-label">
+                <span class="acc-label__num">01</span>
+                <div class="acc-label__title" data-i18n="work.1t">東方風格 3A 遊戲特效</div>
+                <div class="acc-label__tags"><span>Unity3D</span><span>VFX Graph</span><span>Shader</span></div>
+              </div>
+            </div>
+            <div class="acc-panel">
+              <div class="acc-inner m2">
+                <img class="acc-poster" data-poster="" alt="" />
+                <video class="acc-video" data-hls="videos/work-02.m3u8" muted loop playsinline preload="none"></video>
+                <div class="acc-video-placeholder">work-02.m3u8</div>
+              </div>
+              <div class="acc-label">
+                <span class="acc-label__num">02</span>
+                <div class="acc-label__title" data-i18n="work.2t">技能特效系統</div>
+                <div class="acc-label__tags"><span>Particle System</span><span>HLSL</span></div>
+              </div>
+            </div>
+            <div class="acc-panel">
+              <div class="acc-inner m3">
+                <img class="acc-poster" data-poster="" alt="" />
+                <video class="acc-video" data-hls="videos/work-03.m3u8" muted loop playsinline preload="none"></video>
+                <div class="acc-video-placeholder">work-03.m3u8</div>
+              </div>
+              <div class="acc-label">
+                <span class="acc-label__num">03</span>
+                <div class="acc-label__title" data-i18n="work.3t">環境氛圍特效</div>
+                <div class="acc-label__tags"><span>Shader Graph</span><span>Post FX</span></div>
+              </div>
+            </div>
+            <div class="acc-panel">
+              <div class="acc-inner m4">
+                <img class="acc-poster" data-poster="" alt="" />
+                <video class="acc-video" data-hls="videos/work-04.m3u8" muted loop playsinline preload="none"></video>
+                <div class="acc-video-placeholder">work-04.m3u8</div>
+              </div>
+              <div class="acc-label">
+                <span class="acc-label__num">04</span>
+                <div class="acc-label__title" data-i18n="work.4t">魔法武器特效</div>
+                <div class="acc-label__tags"><span>Unity3D</span><span>VFX Graph</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Group 2: 沉浸式展覽 ── -->
+      <div class="gallery-group">
+        <div class="gallery-group__label">
+          <span class="kicker" data-i18n="group.2k">沉浸式展覽</span>
+        </div>
+        <div class="work-gallery-clip">
+          <div class="work-gallery">
+            <div class="acc-panel">
+              <div class="acc-inner m2">
+                <img class="acc-poster" data-poster="" alt="" />
+                <video class="acc-video" data-hls="videos/work-05.m3u8" muted loop playsinline preload="none"></video>
+                <div class="acc-video-placeholder">work-05.m3u8</div>
+              </div>
+              <div class="acc-label">
+                <span class="acc-label__num">05</span>
+                <div class="acc-label__title" data-i18n="work.5t">1914 沉浸式展覽</div>
+                <div class="acc-label__tags"><span>Projection</span><span>Realtime</span><span>Interactive</span></div>
+              </div>
+            </div>
+            <div class="acc-panel">
+              <div class="acc-inner m3">
+                <img class="acc-poster" data-poster="" alt="" />
+                <video class="acc-video" data-hls="videos/work-06.m3u8" muted loop playsinline preload="none"></video>
+                <div class="acc-video-placeholder">work-06.m3u8</div>
+              </div>
+              <div class="acc-label">
+                <span class="acc-label__num">06</span>
+                <div class="acc-label__title" data-i18n="work.6t">互動投影裝置</div>
+                <div class="acc-label__tags"><span>Realtime</span><span>Unity3D</span></div>
+              </div>
+            </div>
+            <div class="acc-panel">
+              <div class="acc-inner m1">
+                <img class="acc-poster" data-poster="" alt="" />
+                <video class="acc-video" data-hls="videos/work-07.m3u8" muted loop playsinline preload="none"></video>
+                <div class="acc-video-placeholder">work-07.m3u8</div>
+              </div>
+              <div class="acc-label">
+                <span class="acc-label__num">07</span>
+                <div class="acc-label__title" data-i18n="work.7t">即時渲染展演</div>
+                <div class="acc-label__tags"><span>Shader</span><span>Unity3D</span></div>
+              </div>
+            </div>
+            <div class="acc-panel">
+              <div class="acc-inner m4">
+                <img class="acc-poster" data-poster="" alt="" />
+                <video class="acc-video" data-hls="videos/work-08.m3u8" muted loop playsinline preload="none"></video>
+                <div class="acc-video-placeholder">work-08.m3u8</div>
+              </div>
+              <div class="acc-label">
+                <span class="acc-label__num">08</span>
+                <div class="acc-label__title" data-i18n="work.8t">實境互動體驗</div>
+                <div class="acc-label__tags"><span>Interactive</span><span>Immersive</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Group 3: 實驗創作 ── -->
+      <div class="gallery-group">
+        <div class="gallery-group__label">
+          <span class="kicker" data-i18n="group.3k">實驗創作</span>
+        </div>
+        <div class="work-gallery-clip">
+          <div class="work-gallery">
+            <div class="acc-panel">
+              <div class="acc-inner m3">
+                <img class="acc-poster" data-poster="" alt="" />
+                <video class="acc-video" data-hls="videos/work-09.m3u8" muted loop playsinline preload="none"></video>
+                <div class="acc-video-placeholder">work-09.m3u8</div>
+              </div>
+              <div class="acc-label">
+                <span class="acc-label__num">09</span>
+                <div class="acc-label__title" data-i18n="work.9t">Shader 實驗</div>
+                <div class="acc-label__tags"><span>HLSL</span><span>Shader Graph</span></div>
+              </div>
+            </div>
+            <div class="acc-panel">
+              <div class="acc-inner m1">
+                <img class="acc-poster" data-poster="" alt="" />
+                <video class="acc-video" data-hls="videos/work-10.m3u8" muted loop playsinline preload="none"></video>
+                <div class="acc-video-placeholder">work-10.m3u8</div>
+              </div>
+              <div class="acc-label">
+                <span class="acc-label__num">10</span>
+                <div class="acc-label__title" data-i18n="work.10t">粒子系統探索</div>
+                <div class="acc-label__tags"><span>VFX Graph</span><span>Particle</span></div>
+              </div>
+            </div>
+            <div class="acc-panel">
+              <div class="acc-inner m4">
+                <img class="acc-poster" data-poster="" alt="" />
+                <video class="acc-video" data-hls="videos/work-11.m3u8" muted loop playsinline preload="none"></video>
+                <div class="acc-video-placeholder">work-11.m3u8</div>
+              </div>
+              <div class="acc-label">
+                <span class="acc-label__num">11</span>
+                <div class="acc-label__title" data-i18n="work.11t">自由接案專案</div>
+                <div class="acc-label__tags"><span>Freelance</span><span>Unity3D</span></div>
+              </div>
+            </div>
+            <div class="acc-panel">
+              <div class="acc-inner m2">
+                <img class="acc-poster" data-poster="" alt="" />
+                <video class="acc-video" data-hls="videos/work-12.m3u8" muted loop playsinline preload="none"></video>
+                <div class="acc-video-placeholder">work-12.m3u8</div>
+              </div>
+              <div class="acc-label">
+                <span class="acc-label__num">12</span>
+                <div class="acc-label__title" data-i18n="work.12t">個人研究計畫</div>
+                <div class="acc-label__tags"><span>Various</span><span>R&amp;D</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /#work -->
+
+    <!-- ░░░░░░░░ ABOUT + TOOLS ░░░░░░░░ -->
+    <section id="about" class="section" data-screen-label="About">
+      <div class="about-grid">
+        <div class="bio reveal">
+          <span class="kicker" data-i18n="about.k">關於我</span>
+          <h2 class="h2" data-i18n="about.title" data-i18n-html="br" style="margin-bottom:34px;">用特效<br>點亮每個畫面</h2>
+          <p data-i18n="about.bio1">我是邱立璟，基隆人，Unity3D 視覺特效師。現任職於遊戲科技公司擔任特效師，曾參與 3A 等級東方風格遊戲開發，擁有互動沉浸式展覽專案經驗，同時有自由接案經驗。</p>
+          <p class="dim" data-i18n="about.bio2">擅長以 Particle System、Shader Graph 與 AI 輔助工具（Claude Code、Codex、Gemini）加速開發流程，並持有 JLPT N1 日文檢定，可進行跨語言協作。</p>
+          <div class="stats">
+            <div class="stat"><div class="n">4+</div><div class="l" data-i18n="stat.1">年資歷</div></div>
+            <div class="stat"><div class="n">3</div><div class="l" data-i18n="stat.2">工作職位</div></div>
+            <div class="stat"><div class="n">2022</div><div class="l" data-i18n="stat.3">放視大賞決選</div></div>
+          </div>
+        </div>
+
+        <div class="about-glass-card reveal">
+          <span class="kicker" data-i18n="tools.k" style="display:block;margin-bottom:24px;">工具使用</span>
+          <div class="tools">
+            <div class="tools__row">
+              <label>Unity3D (VFX / Shader)<span class="pct">96%</span></label>
+              <div class="tools__bar"><div class="fill" data-pct="96"></div></div>
+            </div>
+            <div class="tools__row">
+              <label>Shader Graph / HLSL<span class="pct">92%</span></label>
+              <div class="tools__bar"><div class="fill" data-pct="92"></div></div>
+            </div>
+            <div class="tools__row">
+              <label>Adobe Photoshop<span class="pct">90%</span></label>
+              <div class="tools__bar"><div class="fill" data-pct="90"></div></div>
+            </div>
+            <div class="tools__row">
+              <label>After Effects<span class="pct">84%</span></label>
+              <div class="tools__bar"><div class="fill" data-pct="84"></div></div>
+            </div>
+            <div class="tools__row">
+              <label>3ds Max<span class="pct">78%</span></label>
+              <div class="tools__bar"><div class="fill" data-pct="78"></div></div>
+            </div>
+            <div class="tools__row">
+              <label>Blender<span class="pct">73%</span></label>
+              <div class="tools__bar"><div class="fill" data-pct="73"></div></div>
+            </div>
+            <div class="tools__row">
+              <label>Substance Designer<span class="pct">68%</span></label>
+              <div class="tools__bar"><div class="fill" data-pct="68"></div></div>
+            </div>
+          </div>
+
+          <div style="margin-top:32px;">
+            <span class="kicker" style="display:block;margin-bottom:14px;" data-i18n="spec.k">專長領域</span>
+            <div class="chips">
+              <span>Particle System</span><span>Shader Graph</span><span>Visual Effect Graph</span>
+              <span>Post Processing</span><span>AI 輔助開發</span><span>沉浸式展覽</span>
+              <span>C# 程式</span><span>FL Studio</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ░░░░░░░░ FOOTER ░░░░░░░░ -->
+    <footer id="contact" class="foot" data-screen-label="Contact">
+      <div class="foot__big reveal" data-i18n="foot.big" data-i18n-html="br">LET'S<br>TALK</div>
+      <div class="foot__row">
+        <div>
+          <div style="font-size:22px;font-weight:700;">邱立璟 · Lijing Chiu</div>
+          <div style="font-size:13px;color:var(--faint);margin-top:7px;" data-i18n="foot.role">VFX Artist · 視覺特效師</div>
+        </div>
+        <div class="foot__contact">
+          <a href="tel:0963471107"><span class="ic">☏</span>0963-471-107</a>
+          <a href="mailto:lijingchiu@yahoo.com.tw"><span class="ic">✉</span>lijingchiu@yahoo.com.tw</a>
+        </div>
+      </div>
+      <div class="foot__legal">
+        <span>© 2026 邱立璟 · Lijing Chiu</span>
+        <span data-i18n="foot.loc">Keelung, Taiwan</span>
+      </div>
+    </footer>
+  </main>
+
+  <!-- DOM controller (classic; before module so globals exist) -->
+  <script>
+// ════════════════════════════════════════════════════════════
+// app.js — DOM controller (classic script, runs at end of body)
+//  · Lenis smooth scroll → gsap.ticker → ScrollTrigger
+//  · i18n ZH/EN  ·  light/dark toggle
+//  · scroll reveals, light→dark transition, masked video, pin story
+//  Talks to the WebGL layer via window.__hero
+// ════════════════════════════════════════════════════════════
+(function () {
+  const gsap = window.gsap;
+  gsap.registerPlugin(window.ScrollTrigger);
+  const ST = window.ScrollTrigger;
+
+  /* ─────────── i18n ─────────── */
+  const I18N = {
+    zh: {
+      'nav.work': '作品', 'nav.about': '關於', 'nav.contact': '聯絡', 'nav.talk': '聊聊合作',
+      'nav.resume': '履歷表', 'nav.portfolio': '作品集',
+      'hero.eyebrow': 'VFX ARTIST · UNITY3D SHADER',
+      'hero.lede': '遊戲特效 × 沉浸式展覽 × AI 輔助開發 — 以 Particle System 與 Shader 打造令人印象深刻的視覺體驗。',
+      'hero.cta': '查看我的作品', 'scroll': 'SCROLL',
+      'zone.k': '深度滾動敘事',
+      'zone.1a': '穿越', 'zone.1b': '畫面',
+      'zone.1s': '滾動，進入特效的宇宙。',
+      'zone.2a': 'PARTICLE', 'zone.2b': 'SYSTEM',
+      'zone.2s': '粒子、光絲與動態，凝聚成情感的力量。',
+      'zone.3a': 'SHADER', 'zone.3b': 'ARTISTRY',
+      'zone.3s': '每一道光澤，皆由程式雕琢而成。',
+      'zone.hint': '繼續滾動',
+      'tl.k': '創作歷程', 'tl.title': '一路走來的軌跡',
+      'tl.lead': '從第一行 Shader 到沉浸式展演，每一步都是對視覺極限的探索。',
+      'tl.d1': '2020 · 啟程', 'tl.t1': '踏入即時渲染世界', 'tl.l1a': '投入遊戲特效與即時渲染領域', 'tl.l1b': '從 Unity 粒子系統開始，建立對動態視覺的直覺', 'tl.l1c': '活用各項即時渲染工具',
+      'tl.d2': '2021 · 首個商業專案', 'tl.t2': '手遊技能特效製作', 'tl.l2a': '參與商業手遊的技能與打擊特效', 'tl.l2b': '在效能限制下做出最具張力的畫面', 'tl.l2c': '建立可重用的特效資產流程',
+      'tl.d3': '2022 · 技術深耕', 'tl.t3': '深入 Shader 開發', 'tl.l3a': '自學 HLSL 與 Shader Graph', 'tl.l3b': '從零打造可重用的材質與光效系統', 'tl.l3c': '鑽研數學與光照模型原理',
+      'tl.d4': '2023 · 沉浸式展演', 'tl.t4': '互動裝置與投影', 'tl.l4a': '參與沉浸式展覽製作', 'tl.l4b': '將即時特效延伸到大型投影與互動裝置', 'tl.l4c': '整合感測器與即時互動邏輯',
+      'tl.d5': '2024 · 工作流革新', 'tl.t5': '導入 AI 輔助開發', 'tl.l5a': '將 AI 工具融入特效與前端工作流', 'tl.l5b': '大幅提升從概念到成品的迭代速度', 'tl.l5c': '探索程序化生成與自動化流程',
+      'tl.d6': '2025 · 此刻', 'tl.t6': '打造個人作品集', 'tl.l6a': '整合歷年作品與技術積累', 'tl.l6b': '以這個網站呈現屬於自己的視覺語言', 'tl.l6c': '持續探索 WebGL 與互動體驗',
+      'work.k': '精選作品', 'work.title': '作品集', 'work.lead': '遊戲特效、沉浸式展覽與實驗性視覺專案。',
+      'about.k': '關於我', 'about.title': '用視覺說話<br>用技術實現', 'about.lead': '我是邱立璟，專注於即時渲染特效與沉浸式視覺體驗。擁有遊戲特效、Shader 開發與互動裝置的實戰經驗，曾參與多個商業專案與展覽製作。',
+      'about.s1': '年實戰經驗', 'about.s2': '完成專案', 'about.s3': '核心技術',
+      'group.1k': '遊戲特效', 'group.2k': '沉浸式展覽', 'group.3k': '實驗創作',
+      'work.1t': '東方風格 3A 遊戲特效', 'work.2t': '技能特效系統',
+      'work.3t': '環境氛圍特效', 'work.4t': '魔法武器特效',
+      'work.5t': '1914 沉浸式展覽', 'work.6t': '互動投影裝置',
+      'work.7t': '即時渲染展演', 'work.8t': '實境互動體驗',
+      'work.9t': 'Shader 實驗', 'work.10t': '粒子系統探索',
+      'work.11t': '自由接案專案', 'work.12t': '個人研究計畫',
+      'about.k': '關於我', 'about.title': '用特效\n點亮每個畫面',
+      'about.bio1': '我是邱立璟，基隆人，Unity3D 視覺特效師。現任職於遊戲科技公司擔任特效師，曾參與 3A 等級東方風格遊戲開發，擁有互動沉浸式展覽專案經驗，同時有自由接案經驗。',
+      'about.bio2': '擅長以 Particle System、Shader Graph 與 AI 輔助工具（Claude Code、Codex、Gemini）加速開發流程，並持有 JLPT N1 日文檢定，可進行跨語言協作。',
+      'stat.1': '年資歷', 'stat.2': '工作職位', 'stat.3': '放視大賞決選',
+      'tools.k': '工具使用', 'spec.k': '專長領域',
+      'foot.big': "LET'S\nTALK", 'foot.role': 'VFX Artist · 視覺特效師', 'foot.loc': 'Keelung, Taiwan',
+    },
+    en: {
+      'nav.work': 'Work', 'nav.about': 'About', 'nav.contact': 'Contact', 'nav.talk': "Let's Talk",
+      'nav.resume': 'Resume', 'nav.portfolio': 'Portfolio',
+      'hero.eyebrow': 'VFX ARTIST · UNITY3D SHADER',
+      'hero.lede': 'Game VFX × Immersive Exhibitions × AI-assisted dev — crafting memorable visuals with Particle Systems and Shader art.',
+      'hero.cta': 'View My Work', 'scroll': 'SCROLL',
+      'zone.k': 'Scroll-driven story',
+      'zone.1a': 'INTO THE', 'zone.1b': 'FRAME',
+      'zone.1s': 'Scroll to enter the universe of visual effects.',
+      'zone.2a': 'PARTICLE', 'zone.2b': 'SYSTEM',
+      'zone.2s': 'Particles, light trails and motion — forged into emotion.',
+      'zone.3a': 'SHADER', 'zone.3b': 'ARTISTRY',
+      'zone.3s': 'Every highlight, sculpted by code.',
+      'zone.hint': 'Keep scrolling',
+      'tl.k': 'Journey', 'tl.title': 'The Path So Far',
+      'tl.lead': 'From the first line of shader code to immersive shows — every step pushes the limits of the visual.',
+      'tl.d1': '2020 · Beginning', 'tl.t1': 'Entering Realtime Rendering', 'tl.l1a': 'Stepped into game VFX and realtime rendering', 'tl.l1b': 'Started with Unity particle systems to build motion intuition', 'tl.l1c': 'Got hands-on with realtime rendering tools',
+      'tl.d2': '2021 · First Commercial Project', 'tl.t2': 'Mobile Game Skill VFX', 'tl.l2a': 'Crafted skill and impact effects for a commercial mobile game', 'tl.l2b': 'Maximised drama under tight performance limits', 'tl.l2c': 'Built a reusable VFX asset pipeline',
+      'tl.d3': '2022 · Going Deeper', 'tl.t3': 'Diving into Shaders', 'tl.l3a': 'Self-taught HLSL and Shader Graph', 'tl.l3b': 'Built reusable material and lighting systems from scratch', 'tl.l3c': 'Studied the math and lighting-model fundamentals',
+      'tl.d4': '2023 · Immersive Shows', 'tl.t4': 'Installations & Projection', 'tl.l4a': 'Joined immersive exhibition production', 'tl.l4b': 'Extended realtime VFX onto large-scale projection & installations', 'tl.l4c': 'Integrated sensors with realtime interaction logic',
+      'tl.d5': '2024 · Workflow Shift', 'tl.t5': 'Adopting AI-assisted Dev', 'tl.l5a': 'Integrated AI tools into the VFX and frontend workflow', 'tl.l5b': 'Greatly accelerated iteration from concept to result', 'tl.l5c': 'Explored procedural generation and automation',
+      'tl.d6': '2025 · Now', 'tl.t6': 'Building this Portfolio', 'tl.l6a': 'Brought together years of work and craft', 'tl.l6b': 'Presenting my own visual language through this site', 'tl.l6c': 'Continuing to explore WebGL and interactive experiences',
+      'work.k': 'Selected work', 'work.title': 'Portfolio', 'work.lead': 'Game VFX, immersive exhibitions and experimental visual projects.',
+      'about.k': 'About', 'about.title': 'Speak in visuals<br>Build with code', 'about.lead': 'I am Lijing Chiu, specialising in realtime VFX and immersive visual experiences. With hands-on experience in game VFX, shader development and interactive installations.',
+      'about.s1': 'Years exp.', 'about.s2': 'Projects', 'about.s3': 'Core skills',
+      'group.1k': 'Game VFX', 'group.2k': 'Immersive Exhibitions', 'group.3k': 'Experimental',
+      'work.1t': 'Eastern-style 3A Game VFX', 'work.2t': 'Skill Effect System',
+      'work.3t': 'Environment Atmosphere VFX', 'work.4t': 'Magic Weapon Effects',
+      'work.5t': '1914 Immersive Exhibition', 'work.6t': 'Interactive Projection Installation',
+      'work.7t': 'Realtime Rendered Performance', 'work.8t': 'Mixed Reality Experience',
+      'work.9t': 'Shader Experiments', 'work.10t': 'Particle System R&D',
+      'work.11t': 'Freelance Projects', 'work.12t': 'Personal R&D',
+      'about.k': 'About me', 'about.title': 'Every frame,\nlit by VFX',
+      'about.bio1': "I'm Lijing Chiu from Keelung, Taiwan — a Unity3D VFX artist currently working at a game tech studio. I've participated in 3A-quality Eastern-style game development, have experience in interactive immersive exhibition projects, and also take on freelance work.",
+      'about.bio2': 'I accelerate pipelines with Particle System, Shader Graph and AI tools (Claude Code, Codex, Gemini). JLPT N1 certified — able to collaborate across languages.',
+      'stat.1': 'Yrs Exp.', 'stat.2': 'Roles', 'stat.3': '放視大賞 Award',
+      'tools.k': 'Tools', 'spec.k': 'Specialisms',
+      'foot.big': "LET'S\nTALK", 'foot.role': 'VFX Artist · Unity3D Shader', 'foot.loc': 'Keelung, Taiwan',
+    },
+  };
+
+  function applyLang(lang) {
+    const dict = I18N[lang];
+    document.documentElement.lang = lang === 'zh' ? 'zh-TW' : 'en';
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const k = el.getAttribute('data-i18n');
+      if (dict[k] == null) return;
+      if (el.dataset.i18nHtml === 'br') el.innerHTML = dict[k].replace(/\n/g, '<br>');
+      else el.textContent = dict[k];
+    });
+    document.querySelectorAll('[data-lang-btn]').forEach(b =>
+      b.setAttribute('aria-pressed', b.dataset.langBtn === lang));
+    localStorage.setItem('lc_lang', lang);
+  }
+
+  /* ─────────── theme toggle (manual) ─────────── */
+  let manualTheme = 'dark';
+  function applyTheme(theme, fromScroll) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    if (window.__hero) window.__hero.setTheme(1);
+  }
+
+  /* ─────────── boot ─────────── */
+  function boot() {
+    applyLang(localStorage.getItem('lc_lang') || 'zh');
+    applyTheme(manualTheme);
+
+    // toggles
+    document.querySelectorAll('[data-lang-btn]').forEach(b =>
+      b.addEventListener('click', () => applyLang(b.dataset.langBtn)));
+    document.querySelectorAll('[data-theme-btn]').forEach(b =>
+      b.addEventListener('click', () => applyTheme(b.dataset.themeBtn)));
+
+    // mobile menu
+    const burger = document.getElementById('burger');
+    const mob = document.getElementById('mob');
+    if (burger) burger.addEventListener('click', () => {
+      const open = mob.classList.toggle('open');
+      burger.setAttribute('aria-expanded', open);
+      if (window.__lenis) open ? window.__lenis.stop() : window.__lenis.start();
+    });
+    mob && mob.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+      mob.classList.remove('open'); burger.setAttribute('aria-expanded', false);
+      window.__lenis && window.__lenis.start();
+    }));
+
+    initLenis();
+    initAllHLS();
+    initScroll();
+    // ── VFX-letter reveal: 逐筆描繪後從中心放大 ──
+    (function() {
+      const tSvg = document.getElementById('t-reveal-svg');
+      const tGrp = document.getElementById('t-group');
+      if (!tSvg || !tGrp) return;
+
+      const cx = window.innerWidth  / 2;
+      const cy = window.innerHeight / 2;
+      const diag = Math.sqrt(window.innerWidth**2 + window.innerHeight**2);
+      const targetScale = (Math.ceil(diag / 70) * 3 + 4) * 3;
+
+      tGrp.setAttribute('transform', 'translate(' + cx + ',' + cy + ') scale(1)');
+
+      const svL = document.getElementById('sv-l');
+      const svR = document.getElementById('sv-r');
+      const sfS = document.getElementById('sf-s');
+      const sfT = document.getElementById('sf-t');
+      const sfM = document.getElementById('sf-m');
+      const sx1 = document.getElementById('sx-1');
+      const sx2 = document.getElementById('sx-2');
+      if (!svL||!svR||!sfS||!sfT||!sfM||!sx1||!sx2) return;
+
+      const D   = 0.30;  // 單筆持續時間
+      const GAP = 0.10;  // 字母間小停頓
+      const tl  = gsap.timeline({ delay: 0.3 });
+
+      // ── V：左腿由上到下 → 右腿由上到下 ──
+      tl.to(svL, { attr: { 'stroke-dashoffset': 0 }, duration: D,    ease: 'none' });
+      tl.to(svR, { attr: { 'stroke-dashoffset': 0 }, duration: D,    ease: 'none' });
+      tl.to({},  { duration: GAP });
+
+      // ── F：豎畫由上到下 → 上橫從左到右 → 中橫從左到右 ──
+      tl.to(sfS, { attr: { 'stroke-dashoffset': 0 }, duration: D,        ease: 'none' });
+      tl.to(sfT, { attr: { 'stroke-dashoffset': 0 }, duration: D * 0.55, ease: 'none' });
+      tl.to(sfM, { attr: { 'stroke-dashoffset': 0 }, duration: D * 0.45, ease: 'none' });
+      tl.to({},  { duration: GAP });
+
+      // ── X：第一筆（\) → 第二筆（/) 終點對齊 ──
+      tl.to(sx1, { attr: { 'stroke-dashoffset': 0 }, duration: D,    ease: 'none' });
+      tl.to(sx2, { attr: { 'stroke-dashoffset': 0 }, duration: D,    ease: 'none' }, '-=0.15');
+      tl.to({},  { duration: 0.22 });
+
+      // ── 放大旋轉：白線放大 + 簾幕與白線同步淡出 ──
+      const allLines = [svL, svR, sfS, sfT, sfM, sx1, sx2];
+      const curtain = document.getElementById('t-curtain');
+      const proxy = { s: 1, rot: 0, sw: 20, cop: 1 };
+      const vfxWhite = document.getElementById('vfx-white');
+      const expandTl = gsap.timeline({
+        onComplete: function() {
+          tSvg.remove();
+          if (vfxWhite) vfxWhite.remove();
+        }
+      });
+      // 整體放大旋轉 + 黑色簾幕淡出 (1.15s)
+      expandTl.to(proxy, {
+        s: targetScale, rot: 114, sw: 220, cop: 0,
+        duration: 1.15, ease: 'power2.inOut',
+        onUpdate: function() {
+          tGrp.setAttribute('transform',
+            'translate(' + cx + ',' + cy + ')' +
+            ' rotate(' + proxy.rot.toFixed(3) + ')' +
+            ' scale(' + proxy.s.toFixed(5) + ')');
+          allLines.forEach(function(l){ if(l) l.setAttribute('stroke-width', proxy.sw.toFixed(1)); });
+          if(curtain) curtain.setAttribute('opacity', proxy.cop.toFixed(3));
+        },
+      });
+      // 白色 Solid 層：從放大開始，到放大至一半時（約0.575s）淡出至透明
+      if (vfxWhite) {
+        expandTl.to(vfxWhite, {
+          opacity: 0, duration: 0.30, ease: 'power2.in',
+        }, 0);
+      }
+      tl.add(expandTl);
+    })();
+
+  }
+
+  /* ─────────── HLS video containers ─────────── */
+  function initAllHLS() {
+    const HlsLib = window.Hls;
+    document.querySelectorAll('video[data-hls]').forEach(function(vid) {
+      const src = vid.getAttribute('data-hls');
+      if (!src) return;
+      const inner = vid.parentElement;
+      const panel = vid.closest('.acc-panel');
+      const poster = inner && inner.querySelector('.acc-poster');
+      // apply user-provided poster image, if any
+      if (poster) {
+        const psrc = poster.getAttribute('data-poster');
+        if (psrc) { poster.src = psrc; } else { poster.style.display = 'none'; }
+      }
+
+      // ── gallery panels: lazy-load + play ONLY while focused (hovered) ──
+      if (panel) {
+        let started = false, hls = null;
+        function ensureLoaded() {
+          if (started) return; started = true;
+          if (HlsLib && HlsLib.isSupported()) {
+            hls = new HlsLib({ enableWorker: false, startLevel: -1 });
+            hls.loadSource(src);
+            hls.attachMedia(vid);
+            hls.on(HlsLib.Events.ERROR, function(e, data) { if (data.fatal) hls.destroy(); });
+          } else if (vid.canPlayType('application/vnd.apple.mpegurl')) {
+            vid.src = src; vid.load();
+          }
+        }
+        panel.addEventListener('pointerenter', function() {
+          ensureLoaded();
+          vid.play().catch(function() {});
+        });
+        panel.addEventListener('pointerleave', function() {
+          vid.pause();
+        });
+        return;
+      }
+
+      // ── any other data-hls video: original autoplay behaviour ──
+      if (HlsLib && HlsLib.isSupported()) {
+        const hls = new HlsLib({ enableWorker: false, startLevel: -1 });
+        hls.loadSource(src);
+        hls.attachMedia(vid);
+        hls.on(HlsLib.Events.MANIFEST_PARSED, function() { vid.play().catch(function() {}); });
+        hls.on(HlsLib.Events.ERROR, function(e, data) { if (data.fatal) hls.destroy(); });
+      } else if (vid.canPlayType('application/vnd.apple.mpegurl')) {
+        vid.src = src;
+        vid.load();
+        vid.play().catch(function() {});
+      }
+    });
+  }
+
+  /* ─────────── Lenis → gsap.ticker → ScrollTrigger ─────────── */
+  function initLenis() {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const lenis = new Lenis({ lerp: reduce ? 1 : 0.1, smoothWheel: !reduce, wheelMultiplier: 1 });
+    window.__lenis = lenis;
+    lenis.on('scroll', ST.update);
+    gsap.ticker.add(time => {
+      lenis.raf(time * 1000);
+      if (window.__hero && window.__hero.ready) window.__hero.frame(gsap.ticker.deltaRatio() * 16);
+    });
+    gsap.ticker.lagSmoothing(0);
+
+    // anchor links via lenis
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', e => {
+        const id = a.getAttribute('href');
+        if (id.length > 1 && document.querySelector(id)) { e.preventDefault(); lenis.scrollTo(id, { offset: -10 }); }
+      });
+    });
+  }
+
+  /* ─────────── ScrollTrigger scenes ─────────── */
+  function initScroll() {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // overall page progress → crystals recede
+    ST.create({
+      start: 0, end: 'max',
+      onUpdate: self => window.__hero && window.__hero.setScroll(self.progress),
+    });
+
+    // ── spring word-split for section headings ──
+    function springText(el, triggerEl, baseDelay) {
+      if (reduce) { el.style.opacity = 1; return; }
+      const raw = el.textContent;
+      const words = raw.split(/\s+/).filter(Boolean);
+      el.innerHTML = words.map(w =>
+        `<span class="sw" style="display:inline-block;overflow:hidden;line-height:inherit;"><span class="si" style="display:inline-block;">${w}</span></span>`
+      ).join(' ');
+      gsap.from(el.querySelectorAll('.si'), {
+        yPercent: 105, opacity: 0, rotation: 1.5,
+        duration: 1.1, ease: 'back.out(2.2)',
+        stagger: 0.07, delay: baseDelay || 0,
+        scrollTrigger: { trigger: triggerEl || el, start: 'top 86%', once: true },
+      });
+    }
+    document.querySelectorAll('.h2').forEach(h => springText(h, h.closest('.section') || h));
+
+    // generic reveals — spring pop
+    gsap.utils.toArray('.reveal').forEach(el => {
+      // skip headings already handled
+      if (el.querySelector('.h2')) {
+        gsap.to(el, {
+          opacity: 1, y: 0, scale: 1, duration: 1.3,
+          ease: 'back.out(1.5)',
+          scrollTrigger: { trigger: el, start: 'top 85%', once: true },
+        });
+      } else {
+        gsap.to(el, {
+          opacity: 1, y: 0, scale: 1, duration: 1.2,
+          ease: 'back.out(1.7)',
+          scrollTrigger: { trigger: el, start: 'top 85%', once: true },
+        });
+      }
+    });
+
+    // tool bars fill — spring
+    gsap.utils.toArray('.tools__bar .fill').forEach((el, i) => {
+      gsap.to(el, {
+        width: el.dataset.pct + '%', duration: 1.4,
+        ease: 'back.out(1.3)',
+        scrollTrigger: { trigger: el, start: 'top 90%', once: true },
+        delay: i * 0.04,
+      });
+    });
+
+    // stat numbers — spring pop-in
+    gsap.utils.toArray('.stat').forEach((el, i) => {
+      gsap.from(el, {
+        opacity: 0, y: 30, scale: 0.82, rotation: -2,
+        duration: 1.1, ease: 'back.out(2.4)',
+        delay: i * 0.10,
+        scrollTrigger: { trigger: el, start: 'top 90%', once: true },
+      });
+    });
+
+    // chips — micro spring stagger
+    gsap.utils.toArray('.chips span').forEach((el, i) => {
+      gsap.from(el, {
+        opacity: 0, scale: 0.7, y: 12,
+        duration: 0.7, ease: 'back.out(2.8)',
+        delay: i * 0.055,
+        scrollTrigger: { trigger: el.closest('.chips'), start: 'top 88%', once: true },
+      });
+    });
+
+    // cards — spring stagger
+    gsap.utils.toArray('.card').forEach((card, i) => {
+      gsap.from(card, {
+        opacity: 0, y: 55, scale: 0.93, rotation: i % 2 === 0 ? -1.2 : 1.2,
+        duration: 1.2, ease: 'back.out(1.6)',
+        delay: (i % 3) * 0.10,
+        scrollTrigger: { trigger: card, start: 'top 88%', once: true },
+      });
+    });
+
+    // ── LIGHT → CINEMATIC DARK as we approach the immersive zone ──
+    const zone = document.getElementById('zone');
+    if (zone) {
+      ST.create({
+        trigger: zone, start: 'top 80%', end: 'top 20%', scrub: true,
+        onUpdate: self => {
+          // only auto-drive when user hasn't forced dark
+          const v = self.progress;
+          document.documentElement.setAttribute('data-theme', v > 0.5 ? 'dark' : manualTheme);
+          if (window.__hero) window.__hero.setTheme(Math.max(v, manualTheme === 'dark' ? 1 : 0));
+        },
+      });
+      // back to manual theme after leaving the dark zones (entering work)
+      const work = document.getElementById('work');
+      if (work) ST.create({
+        trigger: work, start: 'top 70%', end: 'top 40%', scrub: true,
+        onUpdate: self => {
+          if (self.progress > 0.5) {
+            document.documentElement.setAttribute('data-theme', manualTheme);
+            if (window.__hero) window.__hero.setTheme(manualTheme === 'dark' ? 1 : 0);
+          }
+        },
+      });
+
+      // pinned story progress → particle tunnel + step crossfades
+      const steps = gsap.utils.toArray('.zone__step');
+      ST.create({
+        trigger: zone, start: 'top top', end: 'bottom bottom', scrub: true,
+        onUpdate: self => {
+          const p = self.progress;
+          if (window.__hero) window.__hero.setZone(Math.sin(Math.min(p, 1) * Math.PI)); // ramp up then down
+          const seg = 1 / steps.length;
+          steps.forEach((s, i) => {
+            const local = (p - i * seg) / seg; // 0..1 within this step
+            const vis = 1 - Math.min(Math.abs(local - 0.5) * 2, 1);
+            gsap.set(s, { opacity: vis, y: (0.5 - Math.min(Math.max(local, 0), 1)) * -120, scale: 0.92 + vis * 0.12 });
+          });
+        },
+      });
+    }
+
+    // ── VERTICAL TIMELINE: progress spine + per-item reveal ──
+    const tlEl = document.querySelector('#timeline .timeline');
+    if (reduce) {
+      gsap.set('#timeline .tl-item, #timeline .tl-year', { opacity: 1, x: 0, y: 0 });
+      document.querySelectorAll('#timeline .tl-item').forEach(it => it.classList.add('in-view'));
+      gsap.set('#timeline .tl-list li', { opacity: 1, x: 0 });
+      const tp0 = document.querySelector('#timeline .tl-progress'); if (tp0) tp0.style.transform = 'scaleY(1)';
+    } else if (tlEl) {
+      // growing spine tied to scroll
+      const prog = tlEl.querySelector('.tl-progress');
+      if (prog) {
+        gsap.fromTo(prog, { scaleY: 0 }, {
+          scaleY: 1, ease: 'none', transformOrigin: 'top center',
+          scrollTrigger: { trigger: tlEl, start: 'top 70%', end: 'bottom 80%', scrub: 0.6 },
+        });
+      }
+      // year badges pop
+      gsap.utils.toArray('#timeline .tl-year').forEach((el) => {
+        gsap.fromTo(el, { opacity: 0, y: 20, scale: 0.85 },
+          { opacity: 1, y: 0, scale: 1, duration: 0.7, ease: 'back.out(1.8)',
+            scrollTrigger: { trigger: el, start: 'top 88%', once: true } });
+      });
+      // each event: slide in, draw branch, fire bullet stagger via in-view class
+      gsap.utils.toArray('#timeline .tl-item').forEach((el) => {
+        const fromX = el.classList.contains('left') ? -36 : 36;
+        const branch = el.querySelector('.tl-branch');
+        const tl = gsap.timeline({ scrollTrigger: { trigger: el, start: 'top 84%', once: true } });
+        tl.fromTo(el, { opacity: 0, x: fromX, y: 22 },
+          { opacity: 1, x: 0, y: 0, duration: 0.8, ease: 'back.out(1.4)' });
+        if (branch) tl.fromTo(branch, { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: 'power3.out' }, '-=0.45');
+        tl.add(() => el.classList.add('in-view'), '-=0.4');
+      });
+    }
+
+    // ── MASKED VIDEO REVEAL: clip-path circle grows with scroll ──
+    const rw = document.querySelector('.reveal-wrap');
+    if (rw && !reduce) {
+      const mask = rw.querySelector('.reveal-mask');
+      gsap.fromTo(mask,
+        { clipPath: 'circle(11vmax at 50% 50%)' },
+        {
+          clipPath: 'circle(82vmax at 50% 50%)', ease: 'none',
+          scrollTrigger: { trigger: rw, start: 'top top', end: 'bottom bottom', scrub: true, pin: '.reveal-sticky' },
+        });
+      gsap.to(rw.querySelector('.reveal-label'), {
+        scale: 1.4, opacity: 0, ease: 'none',
+        scrollTrigger: { trigger: rw, start: 'top top', end: 'center center', scrub: true },
+      });
+    }
+
+    // ── portfolio card parallax on hover ──
+    gsap.utils.toArray('.card').forEach(card => {
+      const media = card.querySelector('.card__media');
+      card.addEventListener('pointermove', e => {
+        const r = card.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width - 0.5;
+        const y = (e.clientY - r.top) / r.height - 0.5;
+        gsap.to(media, { x: x * 18, y: y * 18, duration: 0.6, ease: 'power2.out' });
+      });
+      card.addEventListener('pointerleave', () => gsap.to(media, { x: 0, y: 0, duration: 0.8, ease: 'power3.out' }));
+    });
+
+    // hero macro lines — elastic spring up
+    gsap.from('.macro .row span', {
+      yPercent: 115, opacity: 0,
+      duration: 1.5, ease: 'elastic.out(1, 0.62)',
+      stagger: 0.11, delay: 0.18,
+    });
+    // eyebrow — spring fade
+    gsap.from('.hero__eyebrow', {
+      opacity: 0, y: 22, scale: 0.94,
+      duration: 1.2, ease: 'back.out(2)', delay: 0.7,
+    });
+    // hero foot — spring up with stagger
+    gsap.from('.hero__lede, .scrollcue', {
+      opacity: 0, y: 28, scale: 0.96,
+      duration: 1.2, ease: 'back.out(1.8)',
+      stagger: 0.14, delay: 0.88,
+    });
+    // CTA buttons — spring pop
+    gsap.from('.pill--cta', {
+      opacity: 0, scale: 0.78,
+      duration: 1.0, ease: 'back.out(2.8)', delay: 1.1, clearProps: 'all',
+    });
+    // nav — spring fade down
+    gsap.from('.nav', {
+      opacity: 0, y: -28,
+      duration: 1.1, ease: 'back.out(1.9)', delay: 0.05,
+    });
+
+    // Force a refresh after fonts/layout settle to fix first-scroll stacking
+    setTimeout(() => ST.refresh(), 400);
+    window.addEventListener('load', () => setTimeout(() => ST.refresh(), 200));
+  }
+
+  // hero may not be ready yet; refresh once it is
+  window.addEventListener('hero-ready', () => { applyTheme(manualTheme); ST.refresh(); });
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+
+</script>
+  <!-- WebGL engine (module; deferred, runs after app.js) -->
+  <script type="module">
+// ════════════════════════════════════════════════════════════
+// hero-engine.js — Three.js WebGL layer (ES module)
+//  · Glossy crystal/gem objects with physics hover-to-repel
+//  · Particle tunnel for the immersive scroll zone
+//  · setTheme(t 0..1) light↔cinematic-dark  ·  setScroll(p)
+//  Decoupled from DOM. Driven by gsap.ticker (set up in app.js).
+// ════════════════════════════════════════════════════════════
+import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+// ══════════════════════════════════════════════════════════════════════════
+// WAVE BACKGROUND  (sabosugi / KwNdpPz — verbatim shaders, rendered to RT)
+// ══════════════════════════════════════════════════════════════════════════
+const waveScene    = new THREE.Scene();
+const waveCamera   = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+const waveUniforms = {
+  iTime:          { value: 0.0 },
+  iResolution:    { value: new THREE.Vector3() },
+  uTimeScale:     { value: 0.5 },
+  uWaveSpeed:     { value: 1.0 },
+  uWaveHeight:    { value: 1.0 },
+  uWave1Freq:     { value: 4.8 },
+  uWave1Amp:      { value: 0.038 },
+  uWave2Freq:     { value: 0.3 },
+  uWave2Amp:      { value: -0.09 },
+  uWave3FreqX:    { value: -0.6 },
+  uWave3FreqZ:    { value: -0.7 },
+  uWave3Amp:      { value: 0.12 },
+  uNoiseAmount:   { value: 0.004 },
+  uFoldingOffset: { value: 9.291 },
+  uStepBase:      { value: 0.146 },
+  uGlowIntensity: { value: 0.0085 },
+  uGlowSpread:    { value: 5.1 },
+};
+
+const waveVertexShader = `
+  void main() {
+    gl_Position = vec4(position, 1.0);
+  }
+`;
+
+const waveFragmentShader = `
+  uniform vec3 iResolution;
+  uniform float iTime;
+  uniform float uTimeScale;
+  uniform float uWaveSpeed;
+  uniform float uWaveHeight;
+  uniform float uWave1Freq;
+  uniform float uWave1Amp;
+  uniform float uWave2Freq;
+  uniform float uWave2Amp;
+  uniform float uWave3FreqX;
+  uniform float uWave3FreqZ;
+  uniform float uWave3Amp;
+  uniform float uNoiseAmount;
+  uniform float uFoldingOffset;
+  uniform float uStepBase;
+  uniform float uGlowIntensity;
+  uniform float uGlowSpread;
+
+  float generateFineNoise(vec2 p) {
+    vec3 p3  = fract(vec3(p.xyx) * 8.6231);
+    p3 += dot(p3, p3.yzx + 67.92);
+    return fract((p3.x + p3.y) * p3.z);
+  }
+
+  void main() {
+    vec2 fragCoord = gl_FragCoord.xy;
+    vec2 uv = (2.0 * fragCoord - iResolution.xy) / iResolution.y;
+    vec3 rayDir = normalize(vec3(uv, 1.0));
+    vec4 finalColor = vec4(0.0);
+    float totalDistance = 0.0;
+    float timeElapsed = iTime * uTimeScale;
+    float pixelNoise = generateFineNoise(fragCoord) * uNoiseAmount;
+
+    for (int i = 0; i < 22; i++) {  /* 38→22 iterations: ~40% GPU saving */
+      vec3 currentPos = rayDir * totalDistance;
+      currentPos.z -= 2.0;
+      float wTime = timeElapsed * uWaveSpeed;
+      float waveHeight = (sin(currentPos.x * uWave1Freq + wTime) * uWave1Amp +
+                         sin(currentPos.z * uWave2Freq - wTime * 0.6) * uWave2Amp +
+                         sin((currentPos.x * uWave3FreqX) - (currentPos.z * uWave3FreqZ) + (wTime * 1.6)) * uWave3Amp) * uWaveHeight;
+      float distToWave = abs(currentPos.y - waveHeight);
+      currentPos /= uFoldingOffset;
+      float stepSize = min(distToWave - 0.080, pixelNoise) + uStepBase;
+      totalDistance += stepSize;
+      float patternX = sin(currentPos.x + cos(currentPos.y) * cos(currentPos.z));
+      float patternY = sin(currentPos.z + sin(currentPos.y) * cos(currentPos.x + timeElapsed));
+      float basePattern = smoothstep(0.5, 0.7, patternX * patternY);
+      float blendFactor = 0.15 / (distToWave * distToWave + 0.01);
+      float mixedPattern = mix(basePattern, 1.0, blendFactor);
+      float glowIntensity = uGlowIntensity / (uGlowSpread + stepSize);
+      float distanceFade = smoothstep(36.5, 7.3, totalDistance);
+      vec3 paletteColor = 1.0 + cos(totalDistance * 3.0 + vec3(0.0, 1.0, 2.0));
+      finalColor.rgb += glowIntensity * mixedPattern * distanceFade * paletteColor;
+    }
+
+    float dither = (generateFineNoise(fragCoord + vec2(12.34, 56.78)) - 0.5) / 128.0;
+    finalColor.rgb += vec3(dither);
+    gl_FragColor = vec4(finalColor.rgb, 1.0);
+  }
+`;
+
+const waveMaterial = new THREE.ShaderMaterial({
+  vertexShader:   waveVertexShader,
+  fragmentShader: waveFragmentShader,
+  uniforms:       waveUniforms,
+});
+const waveMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), waveMaterial);
+waveScene.add(waveMesh);
+// waveRT created after renderer below — see after renderer init
+// ══════════════════════════════════════════════════════════════════════════
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+const canvas = document.getElementById('gl');
+const isMobile = window.matchMedia('(max-width: 720px)').matches;
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const renderer = new THREE.WebGLRenderer({
+  canvas, antialias: true, alpha: false, powerPreference: 'high-performance',
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1 : 1.5)); // capped for perf
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.95;  // reduced — avoid blown highlights
+
+// Wave render target — full resolution for crisp background
+const waveRTW = window.innerWidth;
+const waveRTH = window.innerHeight;
+const waveRT  = new THREE.WebGLRenderTarget(waveRTW, waveRTH, {
+  minFilter: THREE.LinearFilter,
+  magFilter: THREE.LinearFilter,
+  depthBuffer: false,
+});
+waveUniforms.iResolution.value.set(waveRTW, waveRTH, 1);
+
+
+const scene = new THREE.Scene();
+const COL_LIGHT = new THREE.Color('#f7f8f2');
+const COL_DARK  = new THREE.Color('#0e0f14');
+scene.background = null; // bgWaveMesh fills screen; null avoids Three.js re-clearing background
+scene.fog = new THREE.Fog(new THREE.Color('#f7f8f2'), 14, 34);
+
+// ── Background wave mesh — samples waveRT each frame, draws behind all crystals ──
+const bgWaveMat = new THREE.ShaderMaterial({
+  uniforms: { tWave: { value: waveRT.texture } },
+  vertexShader: [
+    'varying vec2 vUv;',
+    'void main() {',
+    '  vUv = uv;',
+    '  // Render at NDC far-plane so it never occludes crystals via depth',
+    '  gl_Position = vec4(position.xy, 1.0, 1.0);',
+    '}'
+  ].join('\n'),
+  fragmentShader: [
+    'uniform sampler2D tWave;',
+    'varying vec2 vUv;',
+    'void main() {',
+    '  gl_FragColor = texture2D(tWave, vec2(vUv.x, 1.0 - vUv.y));',
+    '}'
+  ].join('\n'),
+  depthTest:  false,
+  depthWrite: false,
+});
+const bgWaveMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), bgWaveMat);
+bgWaveMesh.frustumCulled = false;
+bgWaveMesh.renderOrder   = -1000;
+scene.add(bgWaveMesh);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 120);
+camera.position.set(0, 0, 13);
+
+// ── Bloom post-processing (must be after scene + camera) ──
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  0.18,  // strength — reduced
+  0.42,  // radius
+  0.90   // threshold
+);
+composer.addPass(bloomPass);
+
+// ── Cinematic HDRI: dark bg, strong backlit rim + caustic colour spots ──
+const envCanvas = document.createElement('canvas');
+envCanvas.width = 1024; envCanvas.height = 512;
+const eCtx = envCanvas.getContext('2d');
+// Deep cinematic dark base
+const skyG = eCtx.createLinearGradient(0, 0, 0, 512);
+skyG.addColorStop(0,    '#03020e');
+skyG.addColorStop(0.28, '#06040f');
+skyG.addColorStop(0.55, '#080512');
+skyG.addColorStop(1,    '#020108');
+eCtx.fillStyle = skyG; eCtx.fillRect(0, 0, 1024, 512);
+// Primary backlight — wide bright rim at the top-centre (simulates key light from behind)
+const backG = eCtx.createRadialGradient(512,40,0, 512,40,360);
+backG.addColorStop(0,   '#ffffff');
+backG.addColorStop(0.18,'#d8e8ff');
+backG.addColorStop(0.5, '#7090cc44');
+backG.addColorStop(1,   'transparent');
+eCtx.globalAlpha = 1.0; eCtx.fillStyle = backG; eCtx.fillRect(0,0,1024,512);
+// Cool blue rim from left
+const rimL = eCtx.createRadialGradient(70,190,0, 70,190,270);
+rimL.addColorStop(0,   '#a8c8ff');
+rimL.addColorStop(0.4, '#5577ff44');
+rimL.addColorStop(1,   'transparent');
+eCtx.globalAlpha = 0.88; eCtx.fillStyle = rimL; eCtx.fillRect(0,0,1024,512);
+// Warm golden rim from right
+const rimR = eCtx.createRadialGradient(920,120,0, 920,120,230);
+rimR.addColorStop(0,   '#ffe8a0');
+rimR.addColorStop(0.35,'#ffcc6644');
+rimR.addColorStop(1,   'transparent');
+eCtx.globalAlpha = 0.78; eCtx.fillStyle = rimR; eCtx.fillRect(0,0,1024,512);
+// Caustic colour bleeds — prismatic spots that become rainbow flecks inside crystals
+const SPOTS = [
+  {x:.16,y:.40,r:.14,c:'#ff44bb',a:.70},{x:.30,y:.25,r:.12,c:'#44aaff',a:.72},
+  {x:.50,y:.55,r:.11,c:'#44ffcc',a:.65},{x:.68,y:.32,r:.13,c:'#ffcc44',a:.68},
+  {x:.82,y:.52,r:.12,c:'#cc55ff',a:.65},{x:.08,y:.68,r:.11,c:'#ff7744',a:.60},
+  {x:.58,y:.72,r:.10,c:'#88eeff',a:.58},{x:.44,y:.50,r:.09,c:'#ffffff',a:.50},
+];
+for (const s of SPOTS) {
+  const gx = eCtx.createRadialGradient(s.x*1024,s.y*512,0,s.x*1024,s.y*512,s.r*420);
+  gx.addColorStop(0, s.c); gx.addColorStop(0.45, s.c+'66'); gx.addColorStop(1, 'transparent');
+  eCtx.globalAlpha = s.a; eCtx.fillStyle = gx; eCtx.fillRect(0,0,1024,512);
+}
+eCtx.globalAlpha = 1;
+const envTex = new THREE.CanvasTexture(envCanvas);
+envTex.mapping = THREE.EquirectangularReflectionMapping;
+const pmrem = new THREE.PMREMGenerator(renderer);
+pmrem.compileEquirectangularShader();
+const envRT = pmrem.fromEquirectangular(envTex);
+scene.environment = envRT.texture;
+envTex.dispose(); pmrem.dispose();
+
+// ── Cinematic backlit lighting rig ──
+// Strong backlight from behind/above — gives the "luminous highlight" rim
+const backKey = new THREE.DirectionalLight(0xeef4ff, 0.85);
+backKey.position.set(0, 6, -14); scene.add(backKey);
+// Cool fill from left
+const fillL = new THREE.DirectionalLight(0x88aaff, 0.55);
+fillL.position.set(-8, 4, 6); scene.add(fillL);
+// Warm rim from right
+const fillR = new THREE.DirectionalLight(0xffe8a0, 0.45);
+fillR.position.set(8, 2, 4); scene.add(fillR);
+scene.add(new THREE.AmbientLight(0x0a0820, 0.5));
+// Orbiting caustic point lights — small, intense, tight radius for caustic glints
+const cLight1 = new THREE.PointLight(0xff55bb, 0.75, 12); scene.add(cLight1);
+const cLight2 = new THREE.PointLight(0x44bbff, 0.70, 11); scene.add(cLight2);
+const cLight3 = new THREE.PointLight(0x55ffcc, 0.65, 10); scene.add(cLight3);
+const cLight4 = new THREE.PointLight(0xffcc44, 0.60, 10); scene.add(cLight4);
+const cLights = [cLight1, cLight2, cLight3, cLight4];
+
+// ─────────────────────────────────────────────
+// CRYSTALS — iridescent diamond/glass, native dispersion (Three.js r160+)
+// ─────────────────────────────────────────────
+
+// ══ UE5-style Glass / Crystal materials ══
+// Shared: flatShading for hard prismatic facets, DoubleSide for internal caustics
+const CP = {
+  clearcoat:          0.45,
+  clearcoatRoughness: 0.08,
+  iridescence:        1.0,
+  iridescenceIOR:     2.2,
+  envMapIntensity:    1.4,
+  flatShading:        true,
+  side:               THREE.DoubleSide,
+};
+
+// ① Heavy crystal — ultra-dense, max IOR, strong chromatic dispersion
+//   Like a lead-crystal paperweight; light bends & splits dramatically
+const matDiamond = new THREE.MeshPhysicalMaterial({
+  ...CP,
+  color:       '#f0f4ff',      // near-white with icy tint
+  transmission: 1.0,
+  roughness:    0.0,
+  ior:          2.42,
+  thickness:    2.2,
+  dispersion:   0.92,
+  iridescenceThicknessRange: [0, 400],
+  specularIntensity: 1.0,
+  specularColor: '#ffffff',
+});
+
+// ② Frosted acrylic — translucent slab, matte surface, soft refraction
+const matPrism = new THREE.MeshPhysicalMaterial({
+  ...CP,
+  color:        '#dce8ff',     // pale steel-blue
+  transmission: 0.88,
+  roughness:    0.14,
+  ior:          1.49,
+  thickness:    1.8,
+  dispersion:   0.55,
+  iridescenceThicknessRange: [80, 600],
+});
+
+// ③ Craft glass — the literal "AACCFF tinted high-end craft glass" from the prompt
+const matAqua = new THREE.MeshPhysicalMaterial({
+  ...CP,
+  color:        '#aaccff',     // signature craft-glass blue tint
+  transmission: 1.0,
+  roughness:    0.05,
+  ior:          1.50,
+  thickness:    2.0,
+  dispersion:   0.72,
+  iridescenceThicknessRange: [100, 520],
+  specularIntensity: 0.95,
+});
+
+// ④ Rose quartz — warm blush, medium IOR, rich internal colour
+const matRose = new THREE.MeshPhysicalMaterial({
+  ...CP,
+  color:        '#ffc8d8',     // rose quartz
+  transmission: 0.90,
+  roughness:    0.03,
+  ior:          1.76,
+  thickness:    1.6,
+  dispersion:   0.68,
+  iridescenceThicknessRange: [120, 580],
+});
+
+// ⑤ Obsidian / smoke glass — dark, semi-transparent, intense caustic sheen
+const matOnyx = new THREE.MeshPhysicalMaterial({
+  ...CP,
+  color:        '#10101e',     // near-black with violet shift
+  transmission: 0.50,
+  roughness:    0.06,
+  metalness:    0.02,
+  ior:          1.90,
+  thickness:    2.5,
+  dispersion:   1.0,
+  envMapIntensity: 3.5,
+  iridescenceThicknessRange: [300, 1400],
+});
+
+// Aliases
+const matWhite = matDiamond;
+const matBlue  = matPrism;
+const matBlack = matOnyx;
+const matGlass = matAqua;
+const matGold  = matRose;
+
+// Rounded cross joint (十字卡榫 with rounded corners)
+function roundedCross(s, mat) {
+  const seg = 3;
+  const rad = Math.min(s * 0.18, 0.14);
+  const grp = new THREE.Group();
+  [
+    new RoundedBoxGeometry(s * 3.4, s, s, seg, rad),   // X arm
+    new RoundedBoxGeometry(s, s * 3.4, s, seg, rad),   // Y arm
+    new RoundedBoxGeometry(s, s, s * 3.4, seg, rad),   // Z arm
+  ].forEach(geo => grp.add(new THREE.Mesh(geo, mat)));
+  return grp;
+}
+
+const SPECS = isMobile ? [
+  { mat: matBlue,  r: 0.58, pos: [-3.4,  1.6, 0] },
+  { mat: matWhite, r: 0.48, pos: [ 3.2, -1.4,-1] },
+  { mat: matGold,  r: 0.38, pos: [ 2.6,  2.2, 0] },
+] : [
+  { mat: matBlue,  r: 0.68, pos: [-4.6,  1.4, 0.5] },
+  { mat: matWhite, r: 0.52, pos: [ 4.4,  2.0,-1.2] },
+  { mat: matBlack, r: 0.62, pos: [ 3.0, -2.0, 0.8] },
+  { mat: matGlass, r: 0.56, pos: [-3.2, -1.8, 1.4] },
+  { mat: matGold,  r: 0.44, pos: [ 0.4,  2.6,-0.6] },
+  { mat: matRose,  r: 0.36, pos: [ 5.6, -1.0, 0  ] },
+  { mat: matPrism, r: 0.30, pos: [-5.4, -0.6, 0.4] },
+];
+
+const crystals = [];
+const group = new THREE.Group();
+// crystals removed — group not added to scene
+
+SPECS.forEach((s, i) => {
+  const mesh = roundedCross(s.r, s.mat);
+  const home = new THREE.Vector3(...s.pos);
+  mesh.position.copy(home);
+  mesh.rotation.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
+  group.add(mesh);
+  crystals.push({
+    mesh, home,
+    pos: home.clone(),
+    vel: new THREE.Vector3(),
+    rotVel: new THREE.Vector3((Math.random() - 0.5) * 0.004, (Math.random() - 0.5) * 0.004, (Math.random() - 0.5) * 0.004),
+    floatPhase: Math.random() * 6.28,
+    floatAmp: 0.18 + Math.random() * 0.22,
+    radius: s.r,
+  });
+});
+
+// ─────────────────────────────────────────────
+// PARTICLE TUNNEL (immersive zone) — hidden until scrolled
+// ─────────────────────────────────────────────
+let tunnel = null, tunnelPos = null, tunnelMat = null;
+const TCOUNT = isMobile ? 700 : 2200;
+if (!reduce) {
+  const arr = new Float32Array(TCOUNT * 3);
+  const RAD = 9, DEPTH = 90;
+  for (let i = 0; i < TCOUNT; i++) {
+    const a = Math.random() * 6.283;
+    const rr = 2.4 + Math.random() * RAD;
+    arr[i * 3] = Math.cos(a) * rr;
+    arr[i * 3 + 1] = Math.sin(a) * rr;
+    arr[i * 3 + 2] = -Math.random() * DEPTH;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+  tunnelPos = arr;
+  tunnelMat = new THREE.PointsMaterial({ color: 0x00dcff, size: isMobile ? 0.07 : 0.055, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
+  tunnel = new THREE.Points(geo, tunnelMat);
+  tunnel.position.z = 0;
+  scene.add(tunnel);
+}
+
+// ─────────────────────────────────────────────
+// MOUSE → world point on z=0 plane (with damping)
+// ─────────────────────────────────────────────
+const ndc = new THREE.Vector2(-2, -2);
+const targetNdc = new THREE.Vector2(-2, -2);
+const raycaster = new THREE.Raycaster();
+const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+const mouseWorld = new THREE.Vector3(999, 999, 0);
+let mouseActive = false;
+
+window.addEventListener('pointermove', e => {
+  targetNdc.x = (e.clientX / window.innerWidth) * 2 - 1;
+  targetNdc.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  mouseActive = true;
+}, { passive: true });
+window.addEventListener('pointerleave', () => { mouseActive = false; });
+
+// ─────────────────────────────────────────────
+// THEME + SCROLL state (lerped)
+// ─────────────────────────────────────────────
+let themeT = 0;        // 0 light, 1 dark  (target)
+let themeCur = 0;      // smoothed
+let scrollP = 0;       // 0..1 overall page progress (target)
+let scrollCur = 0;     // smoothed
+let zoneP = 0;         // 0..1 within immersive zone (target)
+let zoneCur = 0;
+
+const REPEL_R = 4.2;
+const REPEL_K = 0.085;     // repulsion strength
+const SPRING = 0.022;      // pull home
+const DAMP = 0.86;         // velocity damping
+
+let t = 0;
+function frame(dtMs) {
+  const dt = Math.min(dtMs || 16, 40) / 16;
+  t += 0.016 * dt;
+
+  // smooth state
+  themeCur += (themeT - themeCur) * 0.06;
+  scrollCur += (scrollP - scrollCur) * 0.08;
+  zoneCur += (zoneP - zoneCur) * 0.08;
+
+  // ndc damping for buttery mouse
+  ndc.x += (targetNdc.x - ndc.x) * 0.18;
+  ndc.y += (targetNdc.y - ndc.y) * 0.18;
+  if (mouseActive) {
+    raycaster.setFromCamera(ndc, camera);
+    raycaster.ray.intersectPlane(plane, mouseWorld);
+  }
+
+  // crystal physics — removed
+  /*
+  for (const c of crystals) {
+    // idle float around home
+    const fy = Math.sin(t * 0.7 + c.floatPhase) * c.floatAmp * 0.04;
+    const homeY = c.home.y + Math.sin(t * 0.5 + c.floatPhase) * c.floatAmp;
+    const target = c.home.clone(); target.y = homeY;
+
+    // spring toward (floating) home
+    const spring = target.clone().sub(c.pos).multiplyScalar(SPRING);
+    c.vel.add(spring);
+
+    // repulsion from mouse
+    if (mouseActive) {
+      const away = c.pos.clone().sub(mouseWorld);
+      away.z *= 0.4;
+      const d = away.length();
+      if (d < REPEL_R && d > 0.001) {
+        const f = (1 - d / REPEL_R);
+        away.normalize().multiplyScalar(REPEL_K * f * f);
+        c.vel.add(away);
+      }
+    }
+
+    c.vel.multiplyScalar(DAMP);
+    c.pos.add(c.vel);
+    c.mesh.position.copy(c.pos);
+
+    // rotation: idle + spin-up by velocity
+    const speed = c.vel.length();
+    c.mesh.rotation.x += c.rotVel.x + speed * 0.08;
+    c.mesh.rotation.y += c.rotVel.y + speed * 0.10;
+    c.mesh.rotation.z += c.rotVel.z;
+  }
+  */
+
+  // theme: fog colour + exposure + crystal fade as we leave hero
+  const bg = COL_LIGHT.clone().lerp(COL_DARK, themeCur);
+  scene.fog.color.copy(bg);
+  renderer.toneMappingExposure = 0.95 - 0.05 * themeCur;
+  fillL.intensity = 0.40 + 0.15 * themeCur;
+  fillL.color.setHex(themeCur > 0.5 ? 0xa07ef5 : 0x88aaff);
+
+  // crystals recede & fade as immersive zone takes over
+  const fade = 1 - zoneCur;
+
+  // animate coloured lights for dynamic rainbow shimmer
+  const lt = t * 0.38;
+  // cycle light colours slowly for shifting rainbow
+  cLight1.color.setHSL((lt * 0.05) % 1, 0.90, 0.60);
+  cLight2.color.setHSL((lt * 0.05 + 0.33) % 1, 0.90, 0.58);
+  cLight3.color.setHSL((lt * 0.05 + 0.66) % 1, 0.85, 0.62);
+  cLight4.color.setHSL((lt * 0.05 + 0.50) % 1, 0.88, 0.60);
+  cLight1.position.x =  Math.cos(lt       ) * 7;
+  cLight1.position.y =  Math.sin(lt * 0.7 ) * 5;
+  cLight2.position.x =  Math.cos(lt + 2.1 ) * 7;
+  cLight2.position.y =  Math.sin(lt * 0.9 + 1.2) * 5;
+  cLight3.position.x =  Math.cos(lt + 4.2 ) * 6;
+  cLight3.position.y =  Math.sin(lt * 0.6 + 2.4) * 6;
+  cLight4.position.x =  Math.cos(lt + 0.8 ) * 6;
+  cLight4.position.y =  Math.sin(lt * 1.1       ) * 4;
+  const crystalFadeVal = 1 - zoneCur;
+  [cLight1, cLight2, cLight3, cLight4].forEach((l, i) => { l.intensity = (0.45 + 0.18 * Math.sin(t * 0.55 + i * 1.57)) * (0.5 + 0.5 * crystalFadeVal); });
+  // Update dispersion shader uniforms
+  [matDiamond, matPrism, matAqua, matRose, matOnyx].forEach(m => {
+    if (m.__shader) m.__shader.uniforms.uTime.value = t;
+  });
+
+  group.position.z = -scrollCur * 6 - zoneCur * 10;
+  group.scale.setScalar(0.6 + 0.4 * fade);
+  [matDiamond, matPrism, matAqua, matRose, matOnyx].forEach(m => {
+    m.transparent = true; m.opacity = Math.max(0.04, fade);
+  });
+  group.visible = fade > 0.03;
+
+  // particle tunnel: active in immersive zone
+  if (tunnel) {
+    tunnelMat.opacity = zoneCur * 0.9;
+    tunnel.visible = zoneCur > 0.02;
+    if (tunnel.visible) {
+      const sp = (0.25 + zoneCur * 2.2) * dt;
+      for (let i = 0; i < TCOUNT; i++) {
+        let z = tunnelPos[i * 3 + 2] + sp;
+        if (z > camera.position.z) z -= 90;
+        tunnelPos[i * 3 + 2] = z;
+      }
+      tunnel.geometry.attributes.position.needsUpdate = true;
+      tunnel.rotation.z += 0.0015 * dt + zoneCur * 0.004;
+    }
+  }
+
+  // subtle parallax of whole group toward mouse
+  if (mouseActive) {
+    group.rotation.y += ((ndc.x * 0.18) - group.rotation.y) * 0.04;
+    group.rotation.x += ((-ndc.y * 0.12) - group.rotation.x) * 0.04;
+  }
+
+  // update star time
+  starMat.uniforms.uTime.value = t;
+
+  // wave background render
+  window.__waveFrameSkip = ((window.__waveFrameSkip || 0) + 1) % 3;
+  if (window.__waveFrameSkip === 0) {
+    waveUniforms.iTime.value += 0.048 * dt; // compensate 3x skip
+    renderer.setRenderTarget(waveRT);
+    renderer.render(waveScene, waveCamera);
+    renderer.setRenderTarget(null);
+  }
+
+  composer.render();
+}
+
+// ─────────── Star particles ───────────────────────────────────────
+const STAR_COUNT = 180;
+const starGeo  = new THREE.BufferGeometry();
+const starPos  = new Float32Array(STAR_COUNT * 3);
+const starSeed = new Float32Array(STAR_COUNT); // random phase per star
+for (let i = 0; i < STAR_COUNT; i++) {
+  starPos[i*3]   = (Math.random() - 0.5) * 28;
+  starPos[i*3+1] = (Math.random() - 0.5) * 18;
+  starPos[i*3+2] = (Math.random() - 0.5) * 8 - 4;
+  starSeed[i]    = Math.random() * Math.PI * 2;
+}
+starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+starGeo.setAttribute('seed',     new THREE.BufferAttribute(starSeed, 1));
+
+const starMat = new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 } },
+  vertexShader: `
+    attribute float seed;
+    uniform float uTime;
+    varying float vAlpha;
+    void main() {
+      // twinkle: each star has its own phase and speed
+      float twinkle = 0.45 + 0.55 * sin(uTime * (1.2 + seed) + seed * 6.28);
+      vAlpha = twinkle;
+      gl_PointSize = mix(1.0, 3.2, twinkle);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    varying float vAlpha;
+    void main() {
+      float d = length(gl_PointCoord - vec2(0.5));
+      if (d > 0.5) discard;
+      float alpha = (1.0 - d * 2.0) * vAlpha * 0.85;
+      gl_FragColor = vec4(1.0, 1.0, 1.0, alpha);
+    }
+  `,
+  transparent: true,
+  depthWrite:  false,
+  blending:    THREE.AdditiveBlending,
+});
+const starPoints = new THREE.Points(starGeo, starMat);
+starPoints.renderOrder = -999; // render before crystals but after wave bg
+scene.add(starPoints);
+// ──────────────────────────────────────────────────────────────────────────
+
+// resize
+function onResize() {
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+  const rw = window.innerWidth;
+  const rh = window.innerHeight;
+  waveRT.setSize(rw, rh);
+  waveUniforms.iResolution.value.set(rw, rh, 1);
+}
+window.addEventListener('resize', onResize);
+
+// ─────────────────────────────────────────────
+// Public API → consumed by app.js (ScrollTrigger)
+// ─────────────────────────────────────────────
+window.__hero = {
+  ready: true,
+  frame,                                   // called by gsap.ticker
+  setTheme: v => {
+    themeT = Math.max(0, Math.min(1, v));
+    // Update fog colour to match theme; wave mesh is the visual background
+    const bgCol = v > 0.5 ? new THREE.Color('#0e0f14') : new THREE.Color('#f7f8f2');
+    scene.fog.color.copy(bgCol);
+    // Dim/show wave mesh based on theme (slightly brighter in dark mode)
+    bgWaveMat.uniforms.tWave.value = waveRT.texture; // keep ref fresh
+  },
+  setScroll: v => { scrollP = Math.max(0, Math.min(1, v)); },
+  setZone: v => { zoneP = Math.max(0, Math.min(1, v)); },
+  isMobile, reduce,
+};
+window.dispatchEvent(new Event('hero-ready'));
+
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════
+     液態扭曲濾鏡層
+     方案 B：SVG feTurbulence + backdrop-filter + 游標徑向 mask
+     ‣ pointer-events: none → 點擊/Hover/選字 100% 穿透
+     ‣ backdrop-filter 對底下全部 DOM + WebGL 內容即時折射
+     ‣ mask-image 徑向漸層 → 扭曲僅集中在游標周圍
+     ══════════════════════════════════════════════════════════════ -->
+
+<!-- 流體擾動：WebGL 位移圖 canvas（微小透明，僅供 feImage 取樣）-->
+<canvas id="fluid-canvas"
+        style="position:fixed;top:0;left:0;width:1px;height:1px;
+               opacity:0.001;pointer-events:none;z-index:-9999;"></canvas>
+
+<!-- SVG 濾鏡：feImage 取 WebGL canvas → feDisplacementMap 偏移 -->
+<svg id="fluid-svg" xmlns="http://www.w3.org/2000/svg"
+     style="position:fixed;width:0;height:0;overflow:hidden;pointer-events:none;">
+  <defs>
+    <filter id="fluid-filter"
+            x="-8%" y="-8%" width="116%" height="116%"
+            color-interpolation-filters="sRGB">
+      <feImage id="fluid-fe-image" result="disp-map" preserveAspectRatio="none"/>
+      <feDisplacementMap in="SourceGraphic" in2="disp-map"
+                         id="fluid-fe-disp" scale="200"
+                         xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+</svg>
+
+<!-- 流體模擬著色器（ksenia-k jENEMjN 原版，輸出著色器改為位移圖）-->
+<script type="x-shader/x-vertex" id="fs-vert">
+  precision highp float;
+  varying vec2 vUv; attribute vec2 a_position;
+  varying vec2 vL,vR,vT,vB; uniform vec2 u_texel;
+  void main(){vUv=.5*(a_position+1.);vL=vUv-vec2(u_texel.x,0.);vR=vUv+vec2(u_texel.x,0.);vT=vUv+vec2(0.,u_texel.y);vB=vUv-vec2(0.,u_texel.y);gl_Position=vec4(a_position,0.,1.);}
+</script>
+<script type="x-shader/x-fragment" id="fs-adv">
+  precision highp float;precision highp sampler2D;
+  varying vec2 vUv;uniform sampler2D u_velocity_texture,u_input_texture;uniform vec2 u_texel,u_output_textel;uniform float u_dt,u_dissipation;
+  vec4 bl(sampler2D s,vec2 uv,vec2 ts){vec2 st=uv/ts-.5,iuv=floor(st),fuv=fract(st);vec4 a=texture2D(s,(iuv+vec2(.5,.5))*ts),b=texture2D(s,(iuv+vec2(1.5,.5))*ts),c=texture2D(s,(iuv+vec2(.5,1.5))*ts),d=texture2D(s,(iuv+vec2(1.5,1.5))*ts);return mix(mix(a,b,fuv.x),mix(c,d,fuv.x),fuv.y);}
+  void main(){vec2 coord=vUv-u_dt*bl(u_velocity_texture,vUv,u_texel).xy*u_texel;gl_FragColor=u_dissipation*bl(u_input_texture,coord,u_output_textel);}
+</script>
+<script type="x-shader/x-fragment" id="fs-div">
+  precision highp float;precision highp sampler2D;varying highp vec2 vUv,vL,vR,vT,vB;uniform sampler2D u_velocity_texture;
+  void main(){gl_FragColor=vec4(.25*(texture2D(u_velocity_texture,vR).x-texture2D(u_velocity_texture,vL).x+texture2D(u_velocity_texture,vT).y-texture2D(u_velocity_texture,vB).y),0.,0.,1.);}
+</script>
+<script type="x-shader/x-fragment" id="fs-prs">
+  precision highp float;precision highp sampler2D;varying highp vec2 vUv,vL,vR,vT,vB;uniform sampler2D u_pressure_texture,u_divergence_texture;
+  void main(){float L=texture2D(u_pressure_texture,vL).x,R=texture2D(u_pressure_texture,vR).x,T=texture2D(u_pressure_texture,vT).x,B=texture2D(u_pressure_texture,vB).x;gl_FragColor=vec4((L+R+B+T-texture2D(u_divergence_texture,vUv).x)*.25,0.,0.,1.);}
+</script>
+<script type="x-shader/x-fragment" id="fs-grd">
+  precision highp float;precision highp sampler2D;varying highp vec2 vUv,vL,vR,vT,vB;uniform sampler2D u_pressure_texture,u_velocity_texture;
+  void main(){float L=texture2D(u_pressure_texture,vL).x,R=texture2D(u_pressure_texture,vR).x,T=texture2D(u_pressure_texture,vT).x,B=texture2D(u_pressure_texture,vB).x;vec2 v=texture2D(u_velocity_texture,vUv).xy;v-=vec2(R-L,T-B);gl_FragColor=vec4(v,0.,1.);}
+</script>
+<script type="x-shader/x-fragment" id="fs-spl">
+  precision highp float;precision highp sampler2D;varying vec2 vUv;uniform sampler2D u_input_texture;uniform float u_ratio,u_point_size;uniform vec3 u_point_value;uniform vec2 u_point;
+  void main(){vec2 p=vUv-u_point.xy;p.x*=u_ratio;vec3 splat=.6*pow(2.,-dot(p,p)/u_point_size)*u_point_value;gl_FragColor=vec4(texture2D(u_input_texture,vUv).xyz+splat,1.);}
+</script>
+<script type="x-shader/x-fragment" id="fs-out">
+  precision highp float;precision highp sampler2D;
+  varying vec2 vUv;
+  uniform sampler2D u_output_texture,u_velocity_texture;
+  uniform vec2 u_cursor; uniform float u_ratio,u_cr;
+  void main(){
+    vec2 d=vUv-u_cursor;d.x*=u_ratio;
+    float f=1.-smoothstep(0.,u_cr,length(d));
+    float e=texture2D(u_output_texture,vUv).r;
+    vec2 v=normalize(texture2D(u_velocity_texture,vUv).xy+vec2(.001))*e;
+    /* mix 到中性值 0.5 = 零位移，綔全不涉及透明度 */
+    gl_FragColor=vec4(mix(.5,clamp(.5+v.x*5.,.0,1.),f),mix(.5,clamp(.5+v.y*5.,.0,1.),f),.5,1.);
+  }
+</script>
+
+<script>
+(function initFluidDistortion(){
+  'use strict';
+  const C=document.getElementById('fluid-canvas');
+  const R=128; C.width=C.height=R;
+  const gl=C.getContext('webgl',{alpha:false,antialias:false,preserveDrawingBuffer:true});
+  if(!gl){return;}
+  gl.getExtension('OES_texture_float');
+  const feImg=document.getElementById('fluid-fe-image');
+
+  // Backdrop-filter overlay — no mask-image (avoid transparency blend / ghosting)
+  var overlay = document.createElement('div');
+  overlay.id = 'fluid-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;pointer-events:none;';
+  document.body.appendChild(overlay);
+
+  ['nav','main','footer'].forEach(function(sel){
+    var el = document.querySelector(sel);
+    if(el) el.style.filter = '';
+  });
+
+  var RADIUS_PX = 150;
+  var lastActive = 0;
+  var bfOn = false;
+
+  function setBF(on){
+    if(on===bfOn) return; bfOn=on;
+    overlay.style.backdropFilter = on?'url(#fluid-filter)':'none';
+    overlay.style.webkitBackdropFilter = on?'url(#fluid-filter)':'none';
+  }
+
+  const ptr={x:innerWidth/2,y:innerHeight/2,dx:0,dy:0,moved:false};
+  document.addEventListener('mousemove',e=>{ptr.dx=6*(e.clientX-ptr.x);ptr.dy=6*(e.clientY-ptr.y);ptr.x=e.clientX;ptr.y=e.clientY;ptr.moved=true;lastActive=performance.now();},{passive:true});
+
+  function csh(type,id){const s=gl.createShader(type);gl.shaderSource(s,document.getElementById(id).innerHTML.trim());gl.compileShader(s);return s;}
+  const vs=csh(gl.VERTEX_SHADER,'fs-vert');
+  function cprog(fid){const f=csh(gl.FRAGMENT_SHADER,fid);const p=gl.createProgram();gl.attachShader(p,vs);gl.attachShader(p,f);gl.linkProgram(p);const u={},n=gl.getProgramParameter(p,gl.ACTIVE_UNIFORMS);for(let i=0;i<n;i++){const nm=gl.getActiveUniform(p,i).name;u[nm]=gl.getUniformLocation(p,nm);}return{program:p,uniforms:u};}
+  const spl=cprog('fs-spl'),dv=cprog('fs-div'),pr=cprog('fs-prs'),gr=cprog('fs-grd'),ad=cprog('fs-adv'),out=cprog('fs-out');
+
+  function fbo(w,h){gl.activeTexture(gl.TEXTURE0);const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);[gl.TEXTURE_MIN_FILTER,gl.TEXTURE_MAG_FILTER,gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T].forEach((p,i)=>gl.texParameteri(gl.TEXTURE_2D,p,i<2?gl.NEAREST:gl.CLAMP_TO_EDGE));gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,w,h,0,gl.RGB,gl.FLOAT,null);const fb=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,fb);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,t,0);gl.viewport(0,0,w,h);gl.clear(gl.COLOR_BUFFER_BIT);return{fbo:fb,width:w,height:h,attach(id){gl.activeTexture(gl.TEXTURE0+id);gl.bindTexture(gl.TEXTURE_2D,t);return id;}};}
+  function dfbo(w,h){let a=fbo(w,h),b=fbo(w,h);return{width:w,height:h,texelSizeX:1/w,texelSizeY:1/h,read:()=>a,write:()=>b,swap(){const t=a;a=b;b=t;}};}
+
+  const oC=dfbo(R,R),vel=dfbo(R,R),div=fbo(R,R),prs=dfbo(R,R);
+
+  function blit(t){gl.bindBuffer(gl.ARRAY_BUFFER,gl.createBuffer());gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,-1,1,1,1,1,-1]),gl.STATIC_DRAW);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,gl.createBuffer());gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array([0,1,2,0,2,3]),gl.STATIC_DRAW);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);gl.enableVertexAttribArray(0);if(t==null){gl.viewport(0,0,gl.drawingBufferWidth,gl.drawingBufferHeight);gl.bindFramebuffer(gl.FRAMEBUFFER,null);}else{gl.viewport(0,0,t.width,t.height);gl.bindFramebuffer(gl.FRAMEBUFFER,t.fbo);}gl.drawElements(gl.TRIANGLES,6,gl.UNSIGNED_SHORT,0);}
+
+  let frame=0;
+  function render(){
+    requestAnimationFrame(render);
+    const dt=1/60;
+    if(ptr.moved){ptr.moved=false;
+      gl.useProgram(spl.program);gl.uniform1i(spl.uniforms.u_input_texture,vel.read().attach(1));gl.uniform1f(spl.uniforms.u_ratio,1);gl.uniform2f(spl.uniforms.u_point,ptr.x/innerWidth,1-ptr.y/innerHeight);gl.uniform3f(spl.uniforms.u_point_value,ptr.dx,-ptr.dy,0);gl.uniform1f(spl.uniforms.u_point_size,0.3*.001);blit(vel.write());vel.swap();
+      gl.uniform1i(spl.uniforms.u_input_texture,oC.read().attach(1));gl.uniform3f(spl.uniforms.u_point_value,20*.001,0,0);blit(oC.write());oC.swap();}
+    gl.useProgram(dv.program);gl.uniform2f(dv.uniforms.u_texel,vel.texelSizeX,vel.texelSizeY);gl.uniform1i(dv.uniforms.u_velocity_texture,vel.read().attach(1));blit(div);
+    gl.useProgram(pr.program);gl.uniform2f(pr.uniforms.u_texel,vel.texelSizeX,vel.texelSizeY);gl.uniform1i(pr.uniforms.u_divergence_texture,div.attach(1));for(let i=0;i<16;i++){gl.uniform1i(pr.uniforms.u_pressure_texture,prs.read().attach(2));blit(prs.write());prs.swap();}
+    gl.useProgram(gr.program);gl.uniform2f(gr.uniforms.u_texel,vel.texelSizeX,vel.texelSizeY);gl.uniform1i(gr.uniforms.u_pressure_texture,prs.read().attach(1));gl.uniform1i(gr.uniforms.u_velocity_texture,vel.read().attach(2));blit(vel.write());vel.swap();
+    gl.useProgram(ad.program);gl.uniform2f(ad.uniforms.u_texel,vel.texelSizeX,vel.texelSizeY);gl.uniform2f(ad.uniforms.u_output_textel,vel.texelSizeX,vel.texelSizeY);gl.uniform1i(ad.uniforms.u_velocity_texture,vel.read().attach(1));gl.uniform1i(ad.uniforms.u_input_texture,vel.read().attach(1));gl.uniform1f(ad.uniforms.u_dt,dt);gl.uniform1f(ad.uniforms.u_dissipation,.97);blit(vel.write());vel.swap();
+    gl.uniform2f(ad.uniforms.u_output_textel,oC.texelSizeX,oC.texelSizeY);gl.uniform1i(ad.uniforms.u_input_texture,oC.read().attach(2));gl.uniform1f(ad.uniforms.u_dt,8*dt);gl.uniform1f(ad.uniforms.u_dissipation,.98);blit(oC.write());oC.swap();
+    gl.useProgram(out.program);
+    gl.uniform1i(out.uniforms.u_output_texture,oC.read().attach(1));
+    gl.uniform1i(out.uniforms.u_velocity_texture,vel.read().attach(2));
+    gl.uniform2f(out.uniforms.u_cursor,ptr.x/innerWidth,1-ptr.y/innerHeight);
+    gl.uniform1f(out.uniforms.u_ratio,innerWidth/innerHeight);
+    gl.uniform1f(out.uniforms.u_cr,RADIUS_PX/innerHeight);
+    blit(null);
+    gl.viewport(0,0,gl.drawingBufferWidth,gl.drawingBufferHeight);gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.drawElements(gl.TRIANGLES,6,gl.UNSIGNED_SHORT,0);
+    if(++frame%3===0){
+      var idle=performance.now()-lastActive;
+      setBF(idle<2000);
+      if(bfOn) feImg.setAttribute('href',C.toDataURL());
+    }
+  }
+  render();
+})();
+</script>
+</body>
+</html>
