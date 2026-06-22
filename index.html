@@ -189,15 +189,13 @@ body {
   letter-spacing: 0.02em; color: #fff; margin: 0; flex: 1;
 }
 #video-lightbox .vlb-cap-dl {
-  flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%;
+  flex-shrink: 0; width: 38px; height: 38px;
   display: flex; align-items: center; justify-content: center;
-  color: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.18);
-  background: rgba(255,255,255,0.05); text-decoration: none;
-  transition: color 0.2s, background 0.2s, border-color 0.2s, transform 0.2s;
+  color: rgba(255,255,255,0.7); border: none; background: none; text-decoration: none;
+  transition: color 0.2s, transform 0.2s;
 }
 #video-lightbox .vlb-cap-dl:hover {
-  color: #fff; background: rgba(255,255,255,0.14);
-  border-color: rgba(255,255,255,0.4); transform: translateY(-2px);
+  color: #fff; transform: translateY(-2px);
 }
 #video-lightbox .vlb-cap-dl.is-loading {
   pointer-events: none; opacity: 0.6;
@@ -229,6 +227,19 @@ body {
   font-family: 'STXihei', '华文细黑', 'STHeiti', 'Noto Sans TC', sans-serif;
 }
 #video-lightbox .vlb-scrub.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+#video-lightbox .vlb-scrub-pp {
+  flex-shrink: 0; width: 28px; height: 28px; padding: 0;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  border: none; background: none; color: rgba(255,255,255,0.82);
+  transition: color 0.2s, transform 0.2s;
+}
+#video-lightbox .vlb-scrub-pp:hover {
+  color: #fff; transform: translateY(-1px);
+}
+#video-lightbox .vlb-scrub-pp svg { display: block; }
+#video-lightbox .vlb-scrub-pp .vlb-ico-pause { display: none; }
+#video-lightbox .vlb-scrub.is-playing .vlb-scrub-pp .vlb-ico-play { display: none; }
+#video-lightbox .vlb-scrub.is-playing .vlb-scrub-pp .vlb-ico-pause { display: block; }
 #video-lightbox .vlb-scrub-time {
   flex-shrink: 0; min-width: 40px; font-size: 12px; letter-spacing: 0.05em;
   color: rgba(232,234,242,0.62); font-variant-numeric: tabular-nums;
@@ -1319,6 +1330,10 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
       <p class="vlb-cap-desc">—</p>
     </div>
     <div class="vlb-scrub" aria-hidden="true">
+      <button class="vlb-scrub-pp" aria-label="暫停" title="播放／暫停">
+        <svg class="vlb-ico-play" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>
+        <svg class="vlb-ico-pause" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg>
+      </button>
       <span class="vlb-scrub-time vlb-scrub-cur">0:00</span>
       <div class="vlb-scrub-track" role="slider" tabindex="0" aria-label="影片進度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
         <div class="vlb-scrub-buf"></div>
@@ -2737,6 +2752,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
     const scrubBuf = lb.querySelector('.vlb-scrub-buf');
     const scrubCur = lb.querySelector('.vlb-scrub-cur');
     const scrubDur = lb.querySelector('.vlb-scrub-dur');
+    const scrubPP = lb.querySelector('.vlb-scrub-pp');
     let isOpen = false, sourcePanel = null;
 
     // 時間條尺寸：條本身高度 + 與影片之間的間距
@@ -2854,6 +2870,26 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
       if (scrubBuf) scrubBuf.style.width = Math.min(100, (end / d) * 100) + '%';
     }
     function syncDur() { if (scrubDur) scrubDur.textContent = fmtTime(vlbVideo.duration); }
+    // 播放／暫停鍵：依影片狀態切換圖示與無障礙標籤
+    function syncPP() {
+      if (!scrub) return;
+      const playing = !vlbVideo.paused && !vlbVideo.ended;
+      scrub.classList.toggle('is-playing', playing);
+      if (scrubPP) {
+        scrubPP.setAttribute('aria-label', playing ? '暫停' : '播放');
+        scrubPP.setAttribute('aria-pressed', playing ? 'true' : 'false');
+      }
+    }
+    if (scrubPP) {
+      scrubPP.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (vlbVideo.paused || vlbVideo.ended) {
+          const p = vlbVideo.play(); if (p && p.catch) p.catch(function() {});
+        } else {
+          vlbVideo.pause();
+        }
+      });
+    }
     // 由游標 X 座標求出比例，更新 UI 並即時尋訪
     function seekToX(clientX) {
       const d = vlbVideo.duration;
@@ -2871,6 +2907,9 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
       vlbVideo.addEventListener('loadedmetadata', function() { syncDur(); syncScrub(); });
       vlbVideo.addEventListener('durationchange', syncDur);
       vlbVideo.addEventListener('progress', syncBuf);
+      vlbVideo.addEventListener('play', syncPP);
+      vlbVideo.addEventListener('pause', syncPP);
+      vlbVideo.addEventListener('ended', syncPP);
     }
     if (scrubTrack) {
       function endDrag(e) {
@@ -2965,6 +3004,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
       if (scrubBuf) scrubBuf.style.width = '0%';
       if (scrubCur) scrubCur.textContent = '0:00';
       if (scrubDur) scrubDur.textContent = fmtTime(vlbVideo.duration);
+      syncPP();
       const vwNow = window.innerWidth, vhNow = window.innerHeight;
       const coarseNow = window.matchMedia('(pointer: coarse)').matches;
       if (vwNow > vhNow && (vhNow < 640 || (coarseNow && vhNow < 820))) {
