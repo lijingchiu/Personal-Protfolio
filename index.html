@@ -219,6 +219,61 @@ body {
 @media (max-width: 720px) {
   #video-lightbox .vlb-cap-desc { font-size: 13px; line-height: 1.65; }
 }
+/* 影片彈窗：可拖拽時間條 */
+#video-lightbox .vlb-scrub {
+  position: fixed; left: 0; top: 0; width: 200px; z-index: 2;
+  display: flex; align-items: center; gap: 13px;
+  opacity: 0; transform: translateY(12px);
+  transition: opacity 0.55s ease, transform 0.55s cubic-bezier(0.22,1,0.36,1);
+  pointer-events: none;
+  font-family: 'STXihei', '华文细黑', 'STHeiti', 'Noto Sans TC', sans-serif;
+}
+#video-lightbox .vlb-scrub.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+#video-lightbox .vlb-scrub-time {
+  flex-shrink: 0; min-width: 40px; font-size: 12px; letter-spacing: 0.05em;
+  color: rgba(232,234,242,0.62); font-variant-numeric: tabular-nums;
+  -webkit-user-select: none; user-select: none;
+}
+#video-lightbox .vlb-scrub-dur { text-align: right; }
+#video-lightbox .vlb-scrub-track {
+  position: relative; flex: 1; height: 20px; cursor: pointer;
+  display: flex; align-items: center; touch-action: none; outline: none;
+}
+#video-lightbox .vlb-scrub-track::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 50%;
+  transform: translateY(-50%); height: 4px; border-radius: 4px;
+  background: rgba(232,234,242,0.16); transition: height 0.18s ease;
+}
+#video-lightbox .vlb-scrub-track:hover::before,
+#video-lightbox .vlb-scrub-track:focus-visible::before,
+#video-lightbox .vlb-scrub.is-dragging .vlb-scrub-track::before { height: 6px; }
+#video-lightbox .vlb-scrub-buf {
+  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  height: 4px; width: 0; border-radius: 4px; pointer-events: none;
+  background: rgba(232,234,242,0.30);
+  transition: height 0.18s ease, width 0.25s linear;
+}
+#video-lightbox .vlb-scrub-track:hover .vlb-scrub-buf,
+#video-lightbox .vlb-scrub.is-dragging .vlb-scrub-buf { height: 6px; }
+#video-lightbox .vlb-scrub-fill {
+  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  height: 4px; width: 0; border-radius: 4px; pointer-events: none;
+  background: linear-gradient(90deg, var(--accent), var(--accent3));
+  transition: height 0.18s ease;
+}
+#video-lightbox .vlb-scrub-track:hover .vlb-scrub-fill,
+#video-lightbox .vlb-scrub-track:focus-visible .vlb-scrub-fill,
+#video-lightbox .vlb-scrub.is-dragging .vlb-scrub-fill { height: 6px; }
+#video-lightbox .vlb-scrub-handle {
+  position: absolute; right: 0; top: 50%;
+  width: 13px; height: 13px; border-radius: 50%; background: #fff;
+  transform: translate(50%, -50%) scale(0);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.18), 0 2px 9px rgba(0,0,0,0.45);
+  transition: transform 0.18s cubic-bezier(0.22,1,0.36,1);
+}
+#video-lightbox .vlb-scrub-track:hover .vlb-scrub-handle,
+#video-lightbox .vlb-scrub-track:focus-visible .vlb-scrub-handle,
+#video-lightbox .vlb-scrub.is-dragging .vlb-scrub-handle { transform: translate(50%, -50%) scale(1); }
 .nav {
   position: fixed; top: 22px; left: 0; right: 0;
   z-index: 9100; /* 高於暗角(9000)，避免被暗角壓暗 */
@@ -1262,6 +1317,14 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
       </div>
       <div class="vlb-cap-tags"></div>
       <p class="vlb-cap-desc">—</p>
+    </div>
+    <div class="vlb-scrub" aria-hidden="true">
+      <span class="vlb-scrub-time vlb-scrub-cur">0:00</span>
+      <div class="vlb-scrub-track" role="slider" tabindex="0" aria-label="影片進度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="vlb-scrub-buf"></div>
+        <div class="vlb-scrub-fill"><span class="vlb-scrub-handle"></span></div>
+      </div>
+      <span class="vlb-scrub-time vlb-scrub-dur">0:00</span>
     </div>
     <button class="vlb-close" aria-label="關閉">&times;</button>
   </div>
@@ -2656,8 +2719,16 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
     const capDl = lb.querySelector('.vlb-cap-dl');
     const capTags = lb.querySelector('.vlb-cap-tags');
     const capDesc = lb.querySelector('.vlb-cap-desc');
+    const scrub = lb.querySelector('.vlb-scrub');
+    const scrubTrack = lb.querySelector('.vlb-scrub-track');
+    const scrubFill = lb.querySelector('.vlb-scrub-fill');
+    const scrubBuf = lb.querySelector('.vlb-scrub-buf');
+    const scrubCur = lb.querySelector('.vlb-scrub-cur');
+    const scrubDur = lb.querySelector('.vlb-scrub-dur');
     let isOpen = false, sourcePanel = null;
 
+    // 時間條尺寸：條本身高度 + 與影片之間的間距
+    const SCRUB_H = 22, SCRUB_GAP = 16;
     // 量測說明區高度 → 連同影片視為一整塊垂直置中
     function layout() {
       const vw = window.innerWidth, vh = window.innerHeight;
@@ -2665,21 +2736,24 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
       const coarse = window.matchMedia('(pointer: coarse)').matches;
       const landscape = vw > vh && (vh < 640 || (coarse && vh < 820));
       if (landscape) {
-        // 橫向矮視窗：影片置左、說明置右，並排顯示
+        // 橫向矮視窗：影片置左、說明置右，並排顯示；時間條置於影片下方
         const pad = Math.max(20, vw * 0.035);
         const gap = 26;
         const capW = Math.min(Math.max(vw * 0.34, 240), 400);
-        let h = vh - pad * 2;
+        let h = vh - pad * 2 - SCRUB_GAP - SCRUB_H;
         let w = h * 16 / 9;
         const maxVideoW = vw - pad * 2 - gap - capW;
         if (w > maxVideoW) { w = maxVideoW; h = w * 9 / 16; }
         const blockW = w + gap + capW;
         const left = Math.max(pad, (vw - blockW) / 2);
+        const blockH = h + SCRUB_GAP + SCRUB_H;
+        const vtop = Math.max(pad, (vh - blockH) / 2);
         const capH = cap ? cap.offsetHeight : 120;
         const capMaxH = vh - pad * 2;
         return {
           landscape: true,
-          video: { left: left, top: (vh - h) / 2, width: w, height: h },
+          video: { left: left, top: vtop, width: w, height: h },
+          scrub: { left: left, top: vtop + h + SCRUB_GAP, width: w },
           capLeft: left + w + gap, capTop: Math.max(pad, (vh - Math.min(capH, capMaxH)) / 2),
           capWidth: capW, capMaxH: capMaxH,
         };
@@ -2687,15 +2761,16 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
       const marginV = Math.max(36, vh * 0.05);
       const gap = vw < 720 ? 16 : 22;
       const capH = cap ? cap.offsetHeight : 120;
-      const reserve = capH + gap;
+      const reserve = capH + gap + SCRUB_H + SCRUB_GAP;
       let w = Math.min(vw * 0.86, (16 / 9) * (vh - marginV * 2 - reserve));
       let h = w * 9 / 16;
-      const total = h + gap + capH;
+      const total = h + SCRUB_GAP + SCRUB_H + gap + capH;
       const top = (vh - total) / 2;
       return {
         landscape: false,
         video: { left: (vw - w) / 2, top: top, width: w, height: h },
-        capLeft: (vw - w) / 2, capTop: top + h + gap, capWidth: w, capMaxH: null,
+        scrub: { left: (vw - w) / 2, top: top + h + SCRUB_GAP, width: w },
+        capLeft: (vw - w) / 2, capTop: top + h + SCRUB_GAP + SCRUB_H + gap, capWidth: w, capMaxH: null,
       };
     }
 
@@ -2738,6 +2813,88 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
         cap.style.overflowY = '';
       }
     }
+    function placeScrub(L) {
+      if (!scrub || !L.scrub) return;
+      scrub.style.left = L.scrub.left + 'px';
+      scrub.style.top = L.scrub.top + 'px';
+      scrub.style.width = L.scrub.width + 'px';
+    }
+
+    // ── 時間條：格式化 / 進度更新 / 拖拽尋訪 ──
+    function fmtTime(s) {
+      s = Math.max(0, Math.floor(s || 0));
+      const m = Math.floor(s / 60), ss = s % 60;
+      return m + ':' + (ss < 10 ? '0' : '') + ss;
+    }
+    let dragging = false;
+    function syncScrub() {
+      const d = vlbVideo.duration;
+      if (!d || !isFinite(d)) return;
+      const p = Math.max(0, Math.min(1, vlbVideo.currentTime / d));
+      if (scrubFill) scrubFill.style.width = (p * 100) + '%';
+      if (scrubCur) scrubCur.textContent = fmtTime(vlbVideo.currentTime);
+      if (scrubTrack) scrubTrack.setAttribute('aria-valuenow', Math.round(p * 100));
+    }
+    function syncBuf() {
+      const d = vlbVideo.duration;
+      if (!d || !isFinite(d) || !vlbVideo.buffered || !vlbVideo.buffered.length) return;
+      const end = vlbVideo.buffered.end(vlbVideo.buffered.length - 1);
+      if (scrubBuf) scrubBuf.style.width = Math.min(100, (end / d) * 100) + '%';
+    }
+    function syncDur() { if (scrubDur) scrubDur.textContent = fmtTime(vlbVideo.duration); }
+    // 由游標 X 座標求出比例，更新 UI 並即時尋訪
+    function seekToX(clientX) {
+      const d = vlbVideo.duration;
+      if (!d || !isFinite(d) || !scrubTrack) return;
+      const rect = scrubTrack.getBoundingClientRect();
+      let p = rect.width ? (clientX - rect.left) / rect.width : 0;
+      p = Math.max(0, Math.min(1, p));
+      if (scrubFill) scrubFill.style.width = (p * 100) + '%';
+      if (scrubCur) scrubCur.textContent = fmtTime(p * d);
+      if (scrubTrack) scrubTrack.setAttribute('aria-valuenow', Math.round(p * 100));
+      try { vlbVideo.currentTime = p * d; } catch (e) {}
+    }
+    if (vlbVideo) {
+      vlbVideo.addEventListener('timeupdate', function() { if (!dragging) syncScrub(); });
+      vlbVideo.addEventListener('loadedmetadata', function() { syncDur(); syncScrub(); });
+      vlbVideo.addEventListener('durationchange', syncDur);
+      vlbVideo.addEventListener('progress', syncBuf);
+    }
+    if (scrubTrack) {
+      function endDrag(e) {
+        if (!dragging) return;
+        dragging = false;
+        scrub.classList.remove('is-dragging');
+        if (e) seekToX(e.clientX);
+        try { scrubTrack.releasePointerCapture(e.pointerId); } catch (_) {}
+      }
+      scrubTrack.addEventListener('pointerdown', function(e) {
+        if (!vlbVideo.duration || !isFinite(vlbVideo.duration)) return;
+        dragging = true;
+        scrub.classList.add('is-dragging');
+        try { scrubTrack.setPointerCapture(e.pointerId); } catch (_) {}
+        seekToX(e.clientX);
+        e.preventDefault();
+      });
+      scrubTrack.addEventListener('pointermove', function(e) { if (dragging) seekToX(e.clientX); });
+      scrubTrack.addEventListener('pointerup', endDrag);
+      scrubTrack.addEventListener('pointercancel', endDrag);
+      // 鍵盤：左右 ±5 秒
+      scrubTrack.addEventListener('keydown', function(e) {
+        const d = vlbVideo.duration;
+        if (!d || !isFinite(d)) return;
+        let step = 0;
+        if (e.key === 'ArrowRight') step = 5;
+        else if (e.key === 'ArrowLeft') step = -5;
+        else if (e.key === 'Home') { try { vlbVideo.currentTime = 0; } catch (_) {} syncScrub(); e.preventDefault(); return; }
+        else if (e.key === 'End') { try { vlbVideo.currentTime = d; } catch (_) {} syncScrub(); e.preventDefault(); return; }
+        else return;
+        try { vlbVideo.currentTime = Math.max(0, Math.min(d, vlbVideo.currentTime + step)); } catch (_) {}
+        syncScrub();
+        e.preventDefault();
+      });
+    }
+
     // 語系切換時即時更新已開啟的彈窗內容
     window.__lbRefill = function() { if (sourcePanel) fillCaption(sourcePanel); };
     // 下載：用 fetch 抓 blob 強制下載（跨域 download 屬性會被忽略，需 R2 CORS）
@@ -2790,6 +2947,12 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
       // 先填入說明並設定寬度，才能量到正確高度
       fillCaption(panel);
       cap.classList.remove('show');
+      if (scrub) scrub.classList.remove('show');
+      // 重置時間條顯示
+      if (scrubFill) scrubFill.style.width = '0%';
+      if (scrubBuf) scrubBuf.style.width = '0%';
+      if (scrubCur) scrubCur.textContent = '0:00';
+      if (scrubDur) scrubDur.textContent = fmtTime(vlbVideo.duration);
       const vwNow = window.innerWidth, vhNow = window.innerHeight;
       const coarseNow = window.matchMedia('(pointer: coarse)').matches;
       if (vwNow > vhNow && (vhNow < 640 || (coarseNow && vhNow < 820))) {
@@ -2800,6 +2963,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
       gsap.set(lb, { opacity: 1, pointerEvents: 'auto' });
       const L = layout();
       placeCaption(L);
+      placeScrub(L);
       gsap.set(vlbVideo, { left: r.left, top: r.top, width: r.width, height: r.height, borderRadius: 6, opacity: 1 });
       if (vlbPh) gsap.set(vlbPh, { left: r.left, top: r.top, width: r.width, height: r.height, borderRadius: 6 });
       lb.classList.add('open');
@@ -2811,13 +2975,15 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
         duration: 0.62, ease: 'power3.inOut' });
       gsap.fromTo(backdrop, { opacity: 0 }, { opacity: 1, duration: 0.4, ease: 'power2.out' });
       gsap.fromTo(vlbClose, { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.4, delay: 0.3, ease: 'back.out(2)' });
-      setTimeout(function() { cap.classList.add('show'); }, 340);
+      setTimeout(function() { cap.classList.add('show'); if (scrub) scrub.classList.add('show'); }, 340);
       if (window.__lenis) window.__lenis.stop();
     }
 
     function closeLightbox() {
       if (!isOpen) return;
       isOpen = false;
+      dragging = false;
+      if (scrub) scrub.classList.remove('show', 'is-dragging');
       cap.classList.remove('show');
       const r = sourcePanel ? sourcePanel.getBoundingClientRect() : layout().video;
       gsap.to(vlbClose, { opacity: 0, scale: 0.7, duration: 0.2 });
@@ -2846,6 +3012,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
       gsap.set(vlbVideo, { left: L.video.left, top: L.video.top, width: L.video.width, height: L.video.height });
       if (vlbPh) gsap.set(vlbPh, { left: L.video.left, top: L.video.top, width: L.video.width, height: L.video.height });
       placeCaption(L);
+      placeScrub(L);
     });
 
     document.querySelectorAll('.work-gallery .acc-panel').forEach(function(panel) {
