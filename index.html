@@ -2267,14 +2267,26 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
       const curtain = document.getElementById('t-curtain');
       const vfxWhite = document.getElementById('vfx-white');
 
+      // ── 收幕：移除黑色簾幕與白底，並確保 Hero 影片播放（可重複呼叫，具冪等性）──
+      let revealDone = false, revealWatchdog = null;
+      function finishReveal() {
+        if (revealDone) return;
+        revealDone = true;
+        if (revealWatchdog) { clearTimeout(revealWatchdog); revealWatchdog = null; }
+        if (tSvg && tSvg.parentNode) tSvg.remove();
+        if (vfxWhite && vfxWhite.parentNode) vfxWhite.remove();
+        const hv = document.querySelector('.hero__shots-video');
+        if (hv) { const pp = hv.play(); if (pp && pp.catch) pp.catch(function(){}); }
+      }
+      // 失效保險：若揭幕動畫因切換分頁／載入延遲／動畫卡住而未完成，最多 6 秒後強制收幕，
+      // 避免整頁永遠卡在黑色簾幕（rAF 在背景分頁會被節流，gsap 時間軸可能停住）。
+      revealWatchdog = setTimeout(finishReveal, 6000);
+
       // ── 放大階段（字體飄入後執行，維持原本的放大揭幕，不旋轉）──
       function runZoom() {
         const proxy = { s: 1, cop: 1 };
         const expandTl = gsap.timeline({
-          onComplete: function() {
-            tSvg.remove();
-            if (vfxWhite) vfxWhite.remove();
-          }
+          onComplete: finishReveal
         });
         const ZOOM_DUR = 1.15;
         expandTl.to(proxy, {
