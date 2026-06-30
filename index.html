@@ -1369,6 +1369,21 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
   <!-- 白色 Solid 層：載入時先為深色底（與簾幕同色）避免閃光，VFX 描繪時 JS 再切為白色 -->
   <div id="vfx-white" style="position:fixed;inset:0;z-index:9998;background:#07070f;pointer-events:none;"></div>
 
+  <!-- 獨立失效保險：不依賴主腳本/任何 init。即使主腳本在揭幕前就拋錯，
+       也保證最多 7 秒後移除黑色簾幕與白底，整頁絕不會永久卡黑。 -->
+  <script>
+  (function () {
+    setTimeout(function () {
+      ['t-reveal-svg', 'vfx-white'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+      });
+      var hv = document.querySelector('.hero__shots-video');
+      if (hv) { var p = hv.play(); if (p && p.catch) p.catch(function () {}); }
+    }, 7000);
+  })();
+  </script>
+
   <canvas id="gl"></canvas>
 
   <!-- ░░░░░░░░ FLOATING PILL NAVBAR ░░░░░░░░ -->
@@ -2097,6 +2112,12 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
 (function () {
   const gsap = window.gsap;
   gsap.registerPlugin(window.ScrollTrigger);
+
+  // 重新整理修正：瀏覽器預設會還原上次捲動位置，但本站的揭幕／pin／ScrollTrigger
+  // 皆假設由頂端開始；還原到頁面中段會讓初始化算錯位置、遮罩卡住而整頁黑。
+  // 改為手動捲動還原並強制回到頂端，使「重新整理」與「開新視窗」行為一致。
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  try { if (!location.hash) window.scrollTo(0, 0); } catch (e) {}
   const ST = window.ScrollTrigger;
 
   /* ─────────── i18n ─────────── */
@@ -2228,6 +2249,9 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
 
   /* ─────────── boot ─────────── */
   function boot() {
+    // 確保每次載入皆由頂端開始（與開新視窗一致），避免還原捲動位置造成初始化錯亂
+    // （若網址帶有 #anchor 深連結則不強制回頂端，保留錨點跳轉行為）
+    try { if (!location.hash) window.scrollTo(0, 0); } catch (e) {}
     applyLang(localStorage.getItem('lc_lang') || 'zh');
     applyTheme(manualTheme);
 
@@ -2250,14 +2274,9 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
       window.__lenis && window.__lenis.start();
     }));
 
-    initLenis();
-    initMarquee();
-    initAllHLS();
-    initFeatureVideo();
-    initVideoLightbox();
-    initScroll();
-    initHijackFrame();
-    initSecretGallery();
+    // 各初始化獨立 try/catch：任一失敗都不得中斷後續（尤其是揭幕收幕），避免整頁卡黑
+    [initLenis, initMarquee, initAllHLS, initFeatureVideo, initVideoLightbox, initScroll, initHijackFrame, initSecretGallery]
+      .forEach(function (fn) { try { fn(); } catch (e) { try { console.warn('init failed:', fn.name, e); } catch (_) {} } });
     // ── VFX-letter reveal: 逐筆描繪後從中心放大 ──
     (function() {
       const tSvg = document.getElementById('t-reveal-svg');
@@ -3591,6 +3610,17 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
 
   // hero may not be ready yet; refresh once it is
   window.addEventListener('hero-ready', () => { applyTheme(manualTheme); ST.refresh(); });
+
+  // 瀏覽器的捲動還原多在 load 事件前後發生（晚於 boot）；於 load 再次強制回頂端，
+  // 並同步 Lenis，確保「重新整理」最終停在頂端、與開新視窗一致，ScrollTrigger 不錯位。
+  window.addEventListener('load', function () {
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    if (!location.hash) {
+      try { window.scrollTo(0, 0); } catch (e) {}
+      if (window.__lenis) { try { window.__lenis.scrollTo(0, { immediate: true }); } catch (e) {} }
+    }
+    if (window.ScrollTrigger) { try { window.ScrollTrigger.refresh(); } catch (e) {} }
+  });
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
