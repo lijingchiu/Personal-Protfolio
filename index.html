@@ -174,7 +174,6 @@ body {
   font-family: 'STXihei', '华文细黑', 'STHeiti', 'Noto Sans TC', sans-serif;
 }
 #video-lightbox .vlb-caption.show { opacity: 1; transform: translateY(0); }
-#video-lightbox .vlb-caption .vlb-cap-dl { pointer-events: auto; }
 #video-lightbox .vlb-cap-head {
   display: flex; align-items: baseline; gap: 14px;
   padding-bottom: 11px; margin-bottom: 12px;
@@ -188,20 +187,6 @@ body {
   font-size: clamp(17px, 1.6vw, 22px); font-weight: 800; line-height: 1.2;
   letter-spacing: 0.02em; color: #fff; margin: 0; flex: 1;
 }
-#video-lightbox .vlb-cap-dl {
-  flex-shrink: 0; width: 38px; height: 38px;
-  display: flex; align-items: center; justify-content: center;
-  color: rgba(255,255,255,0.7); border: none; background: none; text-decoration: none;
-  transition: color 0.2s, transform 0.2s;
-}
-#video-lightbox .vlb-cap-dl:hover {
-  color: #fff; transform: translateY(-2px);
-}
-#video-lightbox .vlb-cap-dl.is-loading {
-  pointer-events: none; opacity: 0.6;
-  animation: vlbDlSpin 0.8s linear infinite;
-}
-@keyframes vlbDlSpin { to { transform: rotate(360deg); } }
 #video-lightbox .vlb-cap-tags {
   display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 11px;
 }
@@ -1320,11 +1305,6 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
       <div class="vlb-cap-head">
         <span class="vlb-cap-num">01</span>
         <h3 class="vlb-cap-title">—</h3>
-        <a class="vlb-cap-dl" href="#" download aria-label="下載影片" title="下載影片">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M12 3v12"></path><path d="M7 11l5 5 5-5"></path><path d="M5 21h14"></path>
-          </svg>
-        </a>
       </div>
       <div class="vlb-cap-tags"></div>
       <p class="vlb-cap-desc">—</p>
@@ -2759,7 +2739,6 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
     const cap = lb.querySelector('.vlb-caption');
     const capNum = lb.querySelector('.vlb-cap-num');
     const capTitle = lb.querySelector('.vlb-cap-title');
-    const capDl = lb.querySelector('.vlb-cap-dl');
     const capTags = lb.querySelector('.vlb-cap-tags');
     const capDesc = lb.querySelector('.vlb-cap-desc');
     const scrub = lb.querySelector('.vlb-scrub');
@@ -2825,15 +2804,6 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
       if (capNum) capNum.textContent = numEl ? numEl.textContent : '';
       if (capTitle) capTitle.textContent = titleEl ? titleEl.textContent : '';
       if (capDesc) capDesc.textContent = titleEl ? (titleEl.getAttribute('data-caption') || '') : '';
-      if (capDl) {
-        const vid = panel.querySelector('video[data-mp4]');
-        const url = vid ? (vid.getAttribute('data-mp4') || vid.src) : '';
-        let fn = (titleEl ? titleEl.textContent.trim() : 'video');
-        try { fn = decodeURIComponent(url.split('/').pop().split('?')[0]) || fn; } catch (e) {}
-        capDl.href = url;
-        capDl.setAttribute('download', fn);
-        capDl.__url = url; capDl.__fn = fn;
-      }
       if (capTags) {
         capTags.innerHTML = '';
         tagEls.forEach(function(t) {
@@ -2964,28 +2934,6 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display:
 
     // 語系切換時即時更新已開啟的彈窗內容
     window.__lbRefill = function() { if (sourcePanel) fillCaption(sourcePanel); };
-    // 下載：用 fetch 抓 blob 強制下載（跨域 download 屬性會被忽略，需 R2 CORS）
-    if (capDl) {
-      capDl.addEventListener('click', function(e) {
-        e.preventDefault();
-        const url = capDl.__url; const fn = capDl.__fn || 'video.mp4';
-        if (!url || capDl.classList.contains('is-loading')) return;
-        capDl.classList.add('is-loading');
-        fetch(url, { mode: 'cors' })
-          .then(function(r) { if (!r.ok) throw new Error('http ' + r.status); return r.blob(); })
-          .then(function(blob) {
-            const objUrl = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = objUrl; a.download = fn;
-            document.body.appendChild(a); a.click(); a.remove();
-            setTimeout(function() { URL.revokeObjectURL(objUrl); }, 4000);
-          })
-          .catch(function() {
-            window.open(url, '_blank', 'noopener');
-          })
-          .finally(function() { capDl.classList.remove('is-loading'); });
-      });
-    }
 
     function openLightbox(panel) {
       const vid = panel.querySelector('video[data-mp4]');
